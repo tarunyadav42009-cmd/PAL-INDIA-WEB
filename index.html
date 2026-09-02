@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAL INDIA COMPUTER EDUCATION - Enterprise Live Hub</title>
+    <style>
+        /* --- GLOBAL PALETTE THEME CORE CONFIGURATIONS --- */
+        :root {
+            --primary-navy: #2c3e50;
+            --accent-blue: #3498db;
+            --excel-green: #2ecc71;
+            --background-gray: #f5f7fa;
+            --border-color: #dcdde1;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-gray);
+            margin: 0;
+            padding: 0;
+            color: #2c3e50;
+        }
+
+        /* --- NAVIGATION HEADER BAR SYSTEM --- */
+        .header {
+            background-color: var(--primary-navy);
+            color: white;
+            padding: 22px 35px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .header p {
+            margin: 4px 0 0 0;
+            font-size: 12px;
+            color: #cbd5e1;
+        }
+
+        .server-badge {
+            background-color: rgba(46, 204, 113, 0.2);
+            color: var(--excel-green);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+            border: 1px solid var(--excel-green);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 25px;
+        }
+
+        /* --- MULTI-CARD PANEL ROUTER GRID --- */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 45px;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 25px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.05);
+        }
+
+        .card.student-card { border-top: 4px solid var(--excel-green); }
+        .card.fees-card { border-top: 4px solid var(--accent-blue); }
+        .card.search-card { border-top: 4px solid var(--primary-navy); }
+
+        .card h3 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .card.student-card h3 { color: var(--excel-green); }
+        .card.fees-card h3 { color: var(--accent-blue); }
+        .card.search-card h3 { color: var(--primary-navy); }
+
+        .card p {
+            margin: 0;
+            font-size: 13px;
+            color: #7f8c8d;
+            line-height: 1.5;
+        }
+
+        /* --- INTERACTIVE SUBSYSTEM WORKSPACE INTERFACES --- */
+        .module-window {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            padding: 30px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+            display: none;
+        }
+
+        .module-window h2 {
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-size: 20px;
+            border-bottom: 2px solid var(--background-gray);
+            padding-bottom: 12px;
+        }
+
+        .form-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group.full-width {
+            grid-column: span 2;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #34495e;
+        }
+
+        .form-group input {
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 14px;
+            color: #2c3e50;
+            outline: none;
+            transition: border 0.2s ease;
+        }
+
+        .form-group input:focus {
+            border-color: var(--accent-blue);
+        }
+
+        /* --- ACTION CONTROL PIPELINE BUTTONS --- */
+        .btn {
+            padding: 12px 28px;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .btn-green { background-color: var(--excel-green); }
+        .btn-green:hover { background-color: #27ae60; }
+        .btn-blue { background-color: var(--accent-blue); }
+        .btn-blue:hover { background-color: #2980b9; }
+
+        /* --- ENTERPRISE DATA SHEETS DISPLAY MATRIX TABLES --- */
+        .table-responsive {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        table th, table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        table th {
+            background-color: var(--primary-navy);
+            color: white;
+            font-weight: 600;
+        }
+
+        table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .balance-badge {
+            color: #e74c3c;
+            font-weight: bold;
+            background-color: #fdf2f2;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP HEADER STATUS NAVIGATION VIEW PANEL -->
+    <div class="header">
+        <div>
+            <h1>PAL INDIA COMPUTER EDUCATION</h1>
+            <p>Enterprise Portal Connected to Live Web MySQL Core Matrix</p>
+        </div>
+        <div class="server-badge">LIVE CORE ONLINE</div>
+    </div>
+
+    <div class="container">
+        <!-- SYSTEM ACTION LINK CARDS MAPPING GENERATOR -->
+        <div class="grid">
+            <div class="card student-card" onclick="openModule('studentModule')">
+                <h3>Add Student</h3>
+                <p>Register new entries directly into production database tables.</p>
+            </div>
+            <div class="card fees-card" onclick="openModule('feesModule')">
+                <h3>Fees Structure</h3>
+                <p>Generate invoices and subtract live payment accounts profiles.</p>
+            </div>
+            <div class="card search-card" onclick="openModule('searchModule')">
+                <h3>Search Record</h3>
+                <p>Filter, inspect, and trace active student storage logs.</p>
+            </div>
+        </div>
+
+        <!-- MODULE 1: NEW SCHOLAR APPLICATION SHEET -->
+        <div id="studentModule" class="module-window">
+            <h2>Add New Student Record</h2>
+            <div class="form-layout">
+                <div class="form-group"><label>Student Name</label><input type="text" id="regName" placeholder="Enter Full Name"></div>
+                <div class="form-group"><label>Mobile Number</label><input type="text" id="regMobile" placeholder="Enter Contact Number"></div>
+                <div class="form-group"><label>Address Location</label><input type="text" id="regAddress" placeholder="Enter Location"></div>
+                <div class="form-group"><label>Enrolled Course Module</label><input type="text" id="regCourse" placeholder="e.g., Java Fullstack"></div>
+                <div class="form-group"><label>Gross Fee Cost Structure (INR)</label><input type="number" id="regBill" placeholder="0.00"></div>
+                <div class="form-group"><label>Date of Registration</label><input type="text" id="regDate" value="2026-08-29"></div>
+            </div>
+            <button class="btn btn-green" onclick="executeRegister()">Confirm Live SQL Insert</button>
+        </div>
+
+        <!-- MODULE 2: INSTANT PAYMENT LEDGER DEDUCTION ENGINE -->
+        <div id="feesModule" class="module-window">
+            <h2>Post Installment Payment Allocation Log</h2>
+            <div class="form-layout">
+                <div class="form-group"><label>Student System ID Reference</label><input type="number" id="payId" placeholder="Enter Record ID"></div>
+                <div class="form-group"><label>Installment Amount Collected (INR)</label><input type="number" id="payAmount" placeholder="0.00"></div>
+                <div class="form-group full-width"><label>Payment Month Track / Remarks</label><input type="text" id="payRemarks" placeholder="e.g., August Installment"></div>
+            </div>
+            <button class="btn btn-blue" onclick="executePayment()">Post Transaction Balance Deduction</button>
+        </div>
+
+        <!-- MODULE 3: SEARCH DIRECTORY MATRIX SCREEN -->
+        <div id="searchModule" class="module-window">
+            <h2>Active Directory Data Engine Trace</h2>
+            <div style="display: flex; gap: 15px; margin-bottom: 25px;">
+                <input type="text" id="txtFilter" placeholder="Type Scholar or Course Name to search..." style="flex: 1; padding: 12px; border: 1px solid #dcdde1; border-radius: 5px; font-size: 14px;">
+                <button class="btn btn-blue" onclick="executeSearchLookup()">Run Ledger Query</button>
+            </div>
+            <div class="table-responsive">
+                <table id="tblResults">
+                    <thead>
+                        <tr><th>ID</th><th>Scholar Name</th><th>Mobile</th><th>Address</th><th>Course Module</th><th>Gross Base Cost</th><th>Pending Balance Due</th></tr>
+                    </thead>
+ <!-- CORE LOGIC FRAMEWORK NETWORK UTILITY MAPPINGS -->
+    <script>
+        const LOCAL_API_HOST = "http://localhost:8080/api";
+
+        function openModule(targetId) {
+            document.querySelectorAll('.module-window').forEach(view => view.style.display = 'none');
+            document.getElementById(targetId).style.display = 'block';
+        }
+
+        // --- SUBMIT REGISTRATION TRACE ---
+        function executeRegister() {
+            const payload = {
+                name: document.getElementById('regName').value.trim(),
+                mobile_no: document.getElementById('regMobile').value.trim(),
+                address: document.getElementById('regAddress').value.trim(),
+                course: document.getElementById('regCourse').value.trim(),
+                bill: document.getElementById('regBill').value || "0",
+                date_of_admission: document.getElementById('regDate').value.trim()
+            };
+
+            if(!payload.name || !payload.mobile_no) {
+                alert("Validation Error: Student Name and Mobile Number are required metrics.");
+                return;
+            }
+
+            fetch(`${LOCAL_API_HOST}/students`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    alert("Record saved successfully to live DB storage registry!");
+                    document.getElementById('regName').value = '';
+                    document.getElementById('regMobile').value = '';
+                    document.getElementById('regAddress').value = '';
+                    document.getElementById('regCourse').value = '';
+                    document.getElementById('regBill').value = '';
+                }
+            })
+            .catch(err => alert("Pipeline connection error occurred: " + err));
+        }
+
+        // --- SUBMIT TRANSACTION CASH REDUCTION ---
+        function executePayment() {
+            const payload = {
+                student_id: document.getElementById('payId').value,
+                amount: document.getElementById('payAmount').value,
+                remarks: document.getElementById('payRemarks').value.trim()
+            };
+
+            if(!payload.student_id || !payload.amount) {
+                alert("Validation Error: Please select an entry account ID and input numerical currency value.");
+                return;
+            }
+
+            fetch(`${LOCAL_API_HOST}/payments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    alert("Installment posted successfully! Pending balance deducted automatically.");
+                    document.getElementById('payId').value = '';
+                    document.getElementById('payAmount').value = '';
+                    document.getElementById('payRemarks').value = '';
+                }
+            })
+            .catch(err => alert("Deduction routing exception: " + err));
+        }
+
+        // --- EXECUTE LOOKUP MATRIX QUERY MATCH LINES ---
+        function executeSearchLookup() {
+            const keyword = encodeURIComponent(document.getElementById('txtFilter').value.trim());
+            const tableBody = document.querySelector('#tblResults tbody');
+            tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center;">Executing core database search lookups...</td></tr>`;
+
+            fetch(`${LOCAL_API_HOST}/students/search?filter=${keyword}`)
+            .then(res => res.json())
+            .then(data => {
+                tableBody.innerHTML = '';
+                if(data.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color:#7f8c8d;">No customer records matching lookup criteria located in live storage stacks.</td></tr>`;
+                    return;
+                }
+                data.forEach(student => {
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td><b>${student.id}</b></td>
+                            <td>${student.name}</td>
+                            <td>${student.mobile_no}</td>
+                            <td>${student.address}</td>
+                            <td>${student.course}</td>
+                            <td>₹ ${student.bill.toFixed(2)}</td>
+                            <td><span class="balance-badge">₹ ${student.pending_balance.toFixed(2)}</span></td>
+                        </tr>
+                    `;
+                });
+            })
+            .catch(err => {
+                tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: red;">Network parsing trace breakdown exception. Ensure Java console server is running.</td></tr>`;
+            });
+        }
+    </script>
+</body>
+</html>
