@@ -278,245 +278,256 @@
         let localRegistryCache = [];
         let currentlySelectedStudentId = null;
 
-        // FIXED ENGINE DATE AUTOMATION LAYER: Resolves navigation panel routing block crashes
-        window.addEventListener('DOMContentLoaded', () => {
-            const dateInput = document.getElementById('txtDate');
-            if (dateInput) {
-                dateInput.value = new Date().toISOString().split('T')[0];
-            }
-        });
+   const API_BASE = "http://localhost:8080/api";
+let selectedStudentIdForPayment = null;
 
-        function openWindow(windowId) {
-            document.querySelectorAll('.module-window').forEach(win => win.style.display = 'none');
-            document.getElementById(windowId).style.display = 'block';
-            if (windowId === 'feesLedger') { syncPopulateStudentList(); }
-            if (windowId === 'searchModify') { loadFilteredRecords(); }
-            if (windowId === 'globalAudit') { runSystemAudit(); }
-        }
+// Run automatically on page load
+window.onload = function() {
+    // Sync current date to the admission field
+    const dateInput = document.querySelector('input[type="date"]');
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+    
+    // Wire up button click event listeners matching your UI elements
+    setupEventListeners();
+    
+    // Load initial table ledger values
+    runLedgerQuery();
+};
 
-        function confirmSqlInsert() {
-            const name = document.getElementById('txtName').value.trim();
-            const mobile = document.getElementById('txtMobile').value.trim();
-            if (!name || !mobile) { alert("Validation Error: Name and Mobile Number are required."); return; }
+function setupEventListeners() {
+    // 1. Hook into "Confirm SQL Insert" button
+    const insertBtn = findButtonByText("Confirm SQL Insert");
+    if (insertBtn) insertBtn.onclick = registerNewAdmission;
 
-            const payload = {
-                name: name, mobile_no: mobile,
-                address: document.getElementById('txtAddress').value.trim(),
-                course: document.getElementById('txtCourse').value.trim(),
-                bill: document.getElementById('txtBill').value.trim(),
-                date_of_admission: document.getElementById('txtDate').value.trim()
-            };
+    // 2. Hook into "Post Payment Transaction" button
+    const payBtn = findButtonByText("Post Payment Transaction");
+    if (payBtn) payBtn.onclick = postPaymentTransaction;
 
-            fetch('http://localhost:8080/api/students', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(res => res.json()).then(data => {
-                if (data.success) {
-                    alert("Student Registered Successfully!");
-                    document.getElementById('txtName').value = ''; document.getElementById('txtMobile').value = '';
-                    document.getElementById('txtAddress').value = ''; document.getElementById('txtCourse').value = '';
-                    document.getElementById('txtBill').value = '';
-                } else { alert("Database Fault: " + data.error); }
-            });
-        }
+    // 3. Hook into "Run Ledger Query" button
+    const queryBtn = findButtonByText("Run Ledger Query");
+    if (queryBtn) queryBtn.onclick = runLedgerQuery;
 
-        function syncPopulateStudentList() {
-            const tbody = document.getElementById('smallTableBody');
-            tbody.innerHTML = "<tr><td colspan='3'>Retrieving records index...</td></tr>";
+    // 4. Hook into "Save Global Updates" button inside the Profiler Modaler
+    const updateBtn = findButtonByText("Save Global Updates");
+    if (updateBtn) updateBtn.onclick = saveGlobalUpdates;
+    
+    // 5. Hook into "Cancel" button inside the Profiler Modaler
+    const cancelBtn = findButtonByText("Cancel");
+    if (cancelBtn) {
+        cancelBtn.onclick = () => {
+            getModalProfiler().style.display = "none";
+        };
+    }
+}
 
-            fetch('http://localhost:8080/api/students/search?filter=')
-            .then(res => res.json())
-            .then(data => {
-                localRegistryCache = data;
-                tbody.innerHTML = "";
-                data.forEach(student => {
-                    const row = document.createElement('tr');
-                    row.className = "selectable-row";
-                    row.id = `row-uid-${student.id}`;
-                    row.innerHTML = `<td>${student.id}</td><td><b>${student.name}</b></td><td>${student.course}</td>`;
-                    row.onclick = () => selectStudentRowContext(student.id);
-                    tbody.appendChild(row);
-                });
-                if (currentlySelectedStudentId) { selectStudentRowContext(currentlySelectedStudentId); }
-            });
-        }
-
-        function selectStudentRowContext(studentId) {
-            currentlySelectedStudentId = studentId;
-            document.querySelectorAll('.selectable-row').forEach(r => r.style.background = 'none');
-            const targetRow = document.getElementById(`row-uid-${studentId}`);
-            if (targetRow) targetRow.style.background = '#F2F6FA';
-
-            const student = localRegistryCache.find(s => s.id === studentId);
-            if (!student) return;
-
-            document.getElementById('btnProcessPayment').disabled = false;
-            document.getElementById('btnPrint').disabled = false;
-
-            let historyRows = "";
-            if (student.history && student.history.length > 0) {
-                student.history.forEach(tx => {
-                    historyRows += `<tr><td>Installment Entry (${tx.date}) - ${tx.remarks}</td><td align='right'>₹ ${parseFloat(tx.amount).toFixed(2)}</td></tr>`;
-                });
-            }
-
-            const invoiceHtml = `<div class='receipt-card'>
-                <h2>PAL INDIA COMPUTER EDUCATION</h2>
-                <p><b>Student Profile:</b> ${student.name} | <b>Course:</b> ${student.course} | <b>Contact:</b> ${student.mobile_no}</p>
-                <table class='item-table'>
-                    <thead><tr><th>Transaction Milestone Trace</th><th align='right'>Amount (INR)</th></tr></thead>
-                    <tbody>
-                        <tr><td><b>Gross Assigned Base Contract Fees</b></td><td align='right'>₹ ${parseFloat(student.bill).toFixed(2)}</td></tr>
-                        ${historyRows}
-                        <tr class='total-row'><td align='right'>Current Net Remaining Balance:</td><td align='right' style='color:#e74c3c;'>₹ ${parseFloat(student.pending_balance).toFixed(2)}</td></tr>
-                    </tbody>
-                </table>
-            </div>`;
-            document.getElementById('receiptPane').innerHTML = invoiceHtml;
-        }
-
-        function postPaymentTransaction() {
-            const amt = document.getElementById('txtPayAmount').value;
-            const rem = document.getElementById('txtPayRemarks').value.trim() || "Installment Entry";
-            if (!amt || parseFloat(amt) <= 0) { alert("Please input a valid positive collection figure value context."); return; }
-
-            fetch('http://localhost:8080/api/payments', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: currentlySelectedStudentId, amount: amt, remarks: rem })
-            }).then(res => res.json()).then(data => {
-                if (data.success) {
-                    alert("Installment Fee Logged and Subtracted Cleanly!");
-                    document.getElementById('txtPayAmount').value = '';
-                    document.getElementById('txtPayRemarks').value = '';
-                    syncPopulateStudentList();
-                } else { alert("Transaction error: " + data.error); }
-            });
-        }
-
-        function executePrintPipeline() {
-            const printContents = document.getElementById('receiptPane').innerHTML;
-            const originalContents = document.body.innerHTML;
-            document.body.innerHTML = printContents;
-            window.print();
-            document.body.innerHTML = originalContents;
-            window.location.reload();
-        }
-
-        function loadFilteredRecords() {
-            const queryValue = encodeURIComponent(document.getElementById('txtSearch').value.trim());
-            const tbody = document.getElementById('auditTableBody');
-            const tracker = document.getElementById('searchGridTracker');
-            tbody.innerHTML = "<tr><td colspan='8'>Querying active production ledger schema lines...</td></tr>";
-
-            fetch(`http://localhost:8080/api/students/search?filter=${queryValue}`)
-            .then(res => res.json())
-            .then(data => {
-                localRegistryCache = data;
-                tbody.innerHTML = "";
-                tracker.innerText = `Retrieved ${data.length} active row traces matching search metric context parameters.`;
-                
-                if (data.length === 0) {
-                    tbody.innerHTML = "<tr><td colspan='8' style='color:red; text-align:center; font-weight:bold;'>No data logs match filter context criteria inside database.</td></tr>";
-                    return;
-                }
-
-                data.forEach(item => {
-                    const tr = document.createElement('tr');
-                    tr.className = "audit-row";
-                    tr.innerHTML = `
-                        <td><b>#${item.id}</b></td>
-                        <td>${item.name}</td>
-                        <td>${item.mobile_no}</td>
-                        <td>${item.address || 'N/A'}</td>
-                        <td><span style="color:var(--accent-blue); font-weight:600;">${item.course}</span></td>
-                        <td>₹${parseFloat(item.bill).toFixed(2)}</td>
-                        <td><b style="color:${item.pending_balance > 0 ? '#e74c3c' : 'var(--excel-green)'}">₹${parseFloat(item.pending_balance).toFixed(2)}</b></td>
-                        <td><i style="color:gray;">${item.notes || 'No records posted'}</i></td>
-                    `;
-                    tr.ondblclick = () => openEditProfilerModal(item.id);
-                    tbody.appendChild(tr);
-                });
-            });
-        }
-
-        function openEditProfilerModal(studentId) {
-            const student = localRegistryCache.find(s => s.id === studentId);
-            if (!student) return;
-
-            document.getElementById('editStudentId').value = student.id;
-            document.getElementById('editName').value = student.name;
-            document.getElementById('editMobile').value = student.mobile_no;
-            document.getElementById('editAddress').value = student.address || '';
-            document.getElementById('editCourse').value = student.course;
-            document.getElementById('editBill').value = student.bill;
-            document.getElementById('editNotes').value = student.notes || '';
-
-            document.getElementById('editProfilerModal').style.display = 'flex';
-        }
-
-        // Close updates modal box overlay panel context view
-        function closeEditModal() { document.getElementById('editProfilerModal').style.display = 'none'; }
-
-        function commitGlobalUpdates() {
-            const studentId = document.getElementById('editStudentId').value;
-            const payload = {
-                id: studentId,
-        name: document.getElementById('editName').value.trim(),
-        mobile_no: document.getElementById('editMobile').value.trim(),
-        address: document.getElementById('editAddress').value.trim(),
-        course: document.getElementById('editCourse').value.trim(),
-        bill: document.getElementById('editBill').value.trim(),
-        notes: document.getElementById('editNotes').value.trim()
+// 🟢 SUB-ROUTINE 1: ADMISSIONS REGISTER LOOP (POST /api/students)
+async function registerNewAdmission() {
+    // Dynamically query your input fields sequentially based on your labels
+    const inputs = document.querySelectorAll('h2:nth-of-type(1) ~ input, h2:contains("Admissions") ~ input, input');
+    
+    // Safe sequential mapping matching your form fields
+    const payload = {
+        name: sanitizeInput(inputs[0].value),
+        mobile_no: sanitizeInput(inputs[1].value),
+        address: sanitizeInput(inputs[2].value),
+        course: sanitizeInput(inputs[3].value),
+        bill: sanitizeInput(inputs[4].value || "0"),
+        date_of_admission: inputs[5].value
     };
 
-    if (!payload.name || !payload.mobile_no) { 
-        alert("Validation Error: Name and Mobile Number are required."); 
-        return; 
+    if (!payload.name || !payload.mobile_no) {
+        alert("⚠️ Please enter at least a Scholar Name and Mobile Number!");
+        return;
     }
 
-    fetch('http://localhost:8080/api/students', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(res => res.json())
-    .then(data => {
+    try {
+        const res = await fetch(`${API_BASE}/students`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
         if (data.success) {
-            alert("Institutional entry logs modified successfully.");
-            closeEditModal();
-            loadFilteredRecords();
-        } else { 
-            alert("Error saving updates: " + data.error); 
+            alert("🎉 Student Record Saved to MySQL!");
+            inputs[0].value = ""; inputs[1].value = ""; inputs[2].value = ""; inputs[3].value = ""; inputs[4].value = "";
+            runLedgerQuery();
+        } else {
+            alert("❌ Server Error: " + data.error);
         }
-    })
-    .catch(() => alert("Structural error saving updates via API node."));
+    } catch (err) {
+        alert("⚠️ Connection Failed! Ensure Server.java is actively running.");
+    }
 }
 
-function runSystemAudit() {
-    const statusLabel = document.getElementById('dbHealthStatus');
-    const scholarsLabel = document.getElementById('lblScholarsValue');
-    const coursesLabel = document.getElementById('lblCoursesValue');
+// 🔵 SUB-ROUTINE 2: SEARCH QUERY SYSTEM (GET /api/students/search)
+async function runLedgerQuery() {
+    const searchInput = document.querySelector('input[placeholder*="Search"], input[placeholder*="Scholar"]');
+    const filter = searchInput ? searchInput.value : "";
 
-    statusLabel.style.color = '#F39C12'; 
-    statusLabel.innerText = "RUNNING AUDIT...";
+    try {
+        const res = await fetch(`${API_BASE}/students/search?filter=${encodeURIComponent(filter)}`);
+        const students = await res.json();
+        
+        // Target your rows container (the element right below the table headers)
+        const table = document.querySelector('h2:contains("Ledger") ~ table, table:last-of-type');
+        let tbody = table.querySelector('tbody');
+        if (!tbody) {
+            tbody = document.createElement('tbody');
+            table.appendChild(tbody);
+        }
+        tbody.innerHTML = "";
 
-    fetch('http://localhost:8080/api/students/search?filter=')
-    .then(res => res.json())
-    .then(data => {
-        statusLabel.style.color = 'var(--excel-green)';
-        statusLabel.innerText = "CONNECTED ONLINE";
-        scholarsLabel.innerText = data.length;
+        if (students.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:grey;padding:20px;">No matching data arrays found.</td></tr>`;
+            return;
+        }
 
-        const uniqueCoursesSet = new Set(data.map(item => item.course.trim().toLowerCase()));
-        coursesLabel.innerText = uniqueCoursesSet.size;
-    })
-    .catch((ex) => {
-        statusLabel.style.color = '#E74C3C'; 
-        statusLabel.innerText = "OFFLINE / LINK ERROR";
-        scholarsLabel.innerText = "ERR";
-        coursesLabel.innerText = "ERR";
-        console.error(ex);
-    });
+        students.forEach(st => {
+            const row = document.createElement("tr");
+            row.style.cursor = "pointer";
+            row.title = "Double-click to modify this profile";
+            
+            // Map the double-click event requested in your layout instructions
+            row.ondblclick = () => openModifyProfiler(st);
+            
+            row.innerHTML = `
+                <td>${st.id}</td>
+                <td><strong>${st.name}</strong></td>
+                <td>${st.mobile_no}</td>
+                <td>${st.address}</td>
+                <td>${st.course}</td>
+                <td>₹${st.bill}</td>
+                <td style="color:${st.pending_balance > 0 ? 'red' : 'green'};font-weight:bold;">₹${st.pending_balance}</td>
+                <td><small>${st.notes || ''}</small></td>
+                <td><button onclick="event.stopPropagation(); loadIntoInstallmentTerminal(${JSON.stringify(st)})" style="padding:2px 5px;font-size:11px;">Select</button></td>
+            `;
+            tbody.appendChild(row);
+        });
+    } catch (err) {
+        console.error("Pipeline mapping broke on query cycles:", err);
+    }
 }
+
+// 🟠 SUB-ROUTINE 3: HYDRATE THE PAYMENT TERMINAL
+function loadIntoInstallmentTerminal(student) {
+    selectedStudentIdForPayment = student.id;
+    
+    // Find text container components inside the Monthly Installment Terminal
+    const terminalSection = document.querySelector('h2:contains("Installment"), div:contains("Installment")');
+    if(terminalSection) {
+        // Find or create elements to display live confirmation data
+        let displayBox = document.getElementById("terminal_live_display");
+        if(!displayBox) {
+            displayBox = document.createElement("div");
+            displayBox.id = "terminal_live_display";
+            displayBox.style.color = "#2563eb";
+            displayBox.style.margin = "10px 0";
+            displayBox.style.fontWeight = "bold";
+            terminalSection.appendChild(displayBox);
+        }
+        displayBox.innerText = `👉 Selected Scholar ID: ${student.id} | Name: ${student.name} | Program: ${student.course}`;
+    } else {
+        alert(`Selected: [ID ${student.id}] ${student.name} for Fees.`);
+    }
+}
+
+// 🟤 SUB-ROUTINE 4: POST PAYMENT TRANSACTION (POST /api/payments)
+async function postPaymentTransaction() {
+    if (!selectedStudentIdForPayment) {
+        alert("⚠️ Select a student record row using the 'Select' button first!");
+        return;
+    }
+
+    const amountInput = document.querySelector('input[placeholder*="Amount"], label:contains("Amount") + input, input[type="number"]:nth-of-type(2)');
+    const remarksInput = document.querySelector('input[placeholder*="Month"], label:contains("Month") + input, input[type="text"]:last-of-type');
+
+    const payload = {
+        id: selectedStudentIdForPayment.toString(),
+        amount: amountInput ? amountInput.value : "0",
+        remarks: remarksInput ? remarksInput.value : "Installment Entry"
+    };
+
+    try {
+        const res = await fetch(`${API_BASE}/payments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert("✅ Payment Transaction Posted and Written to Ledger!");
+            if(amountInput) amountInput.value = "";
+            if(remarksInput) remarksInput.value = "";
+            runLedgerQuery();
+        }
+    } catch (err) {
+        alert("Transaction execution engine error.");
+    }
+}
+
+// 🟣 SUB-ROUTINE 5: OPEN AND SAVE MODIFICATIONS (PUT /api/students)
+function openModifyProfiler(student) {
+    const panel = getModalProfiler();
+    panel.style.display = "block";
+    panel.setAttribute("data-id", student.id); // Track active reference key
+
+    const inputs = panel.querySelectorAll('input, textarea');
+    if(inputs.length >= 6) {
+        inputs[0].value = student.name;
+        inputs[1].value = student.mobile_no;
+        inputs[2].value = student.address;
+        inputs[3].value = student.course;
+        inputs[4].value = student.bill;
+        inputs[5].value = student.notes || "";
+    }
+}
+
+async function saveGlobalUpdates() {
+    const panel = getModalProfiler();
+    const id = panel.getAttribute("data-id");
+    const inputs = panel.querySelectorAll('input, textarea');
+
+    const payload = {
+        id: id,
+        name: sanitizeInput(inputs[0].value),
+        mobile_no: sanitizeInput(inputs[1].value),
+        address: sanitizeInput(inputs[2].value),
+        course: sanitizeInput(inputs[3].value),
+        bill: sanitizeInput(inputs[4].value || "0"),
+        notes: sanitizeInput(inputs[5].value)
+    };
+
+    try {
+        const res = await fetch(`${API_BASE}/students`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert("🔄 Global Database Row Modified Successfully!");
+            panel.style.display = "none";
+            runLedgerQuery();
+        }
+    } catch (err) {
+        alert("Pipeline error updating profile properties.");
+    }
+}
+
+// 🛠️ INFRASTRUCTURE HELPERS (Ensures zero JSON parser failures)
+function sanitizeInput(str) {
+    if (!str) return "";
+    // REMOVES COMMAS AND QUOTES so your Server.java string parser doesn't break!
+    return str.replace(/,/g, " ").replace(/"/g, "'").trim();
+}
+
+function findButtonByText(text) {
+    return Array.from(document.querySelectorAll('button')).find(el => el.textContent.includes(text));
+}
+
+function getModalProfiler() {
+    // Locates your Modify Profiler component block container dynamically
+    const header = Array.from(document.querySelectorAll('h3')).find(el => el.textContent.includes("Modify"));
+    return header ? header.parentElement : document.body;
+}
+
