@@ -1,296 +1,1621 @@
-import com.sun.net.httpserver.HttpServer;
-import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
+
 import java.io.*;
-import java.net.InetSocketAddress;
-import java.net.URLDecoder;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.Executors;
 
 public class Server {
 
-    // Target MySQL Connection URL Parameters matching your original setup context
-    public static final String DB_URL = "jdbc:mysql://localhost:3306/pal_india_db";
-    public static final String DB_USER = "root";
-    public static final String DB_PASSWORD = "";
+    /*
+     * Production configuration is read from environment variables.
+     *
+     * DB_HOST
+     * DB_PORT
+     * DB_NAME
+     * DB_USER
+     * DB_PASSWORD
+     * SERVER_HOST
+     * SERVER_PORT
+     */
 
-    public static void main(String[] args) throws IOException {
-        try {
-            // Explicitly force register the MySQL Driver class into JVM memory space
-            Class.forName("com.mysql.cj.jdbc.Driver");
-        } catch (ClassNotFoundException e) {
-            System.err.println("⚠️ Warning: MySQL Driver Jar file is missing from folder location!");
+    private static final String DB_HOST =
+            env("DB_HOST", "127.0.0.1");
+
+    private static final String DB_PORT =
+            env("DB_PORT", "3306");
+
+    private static final String DB_NAME =
+            env("DB_NAME", "pal_india_db");
+
+    private static final String DB_USER =
+            env("DB_USER", "palindia");
+
+    private static final String DB_PASSWORD =
+            env("DB_PASSWORD", "");
+
+    private static final String SERVER_HOST =
+            env("SERVER_HOST", "127.0.0.1");
+
+    private static final int SERVER_PORT =
+            Integer.parseInt(env("SERVER_PORT", "8080"));
+
+    private static final Path PUBLIC_DIR =
+            Paths.get(env("PUBLIC_DIR", "public"))
+                 .toAbsolutePath()
+                 .normalize();
+
+    public static final String DB_URL =
+            "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME
+                    + "?useSSL=false"
+                    + "&serverTimezone=UTC"
+                    + "&characterEncoding=UTF-8";
+
+    public static void main(String[] args) throws Exception {
+
+        Class.forName("com.mysql.cj.jdbc.Driver");
+
+        System.out.println("========================================");
+        System.out.println(" PAL INDIA SERVER");
+        System.out.println("========================================");
+        System.out.println("Database : " + DB_HOST + ":" + DB_PORT + "/" + DB_NAME);
+        System.out.println("Web      : " + SERVER_HOST + ":" + SERVER_PORT);
+        System.out.println("Public   : " + PUBLIC_DIR);
+        System.out.println("========================================");
+
+        // Verify database connection before starting.
+        try (Connection ignored =
+                     DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+
+            System.out.println("Database connection: OK");
         }
 
-        // Initialize HttpServer instance listening on Port 8080
-        HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
-        
-        // Operational endpoints mapping pathway triggers to custom handler classes
-        server.createContext("/api/students", new StudentsHandler());
+        HttpServer server =
+                HttpServer.create(
+                        new InetSocketAddress(SERVER_HOST, SERVER_PORT),
+                        0
+                );
+
+        // API endpoints
+        server.createContext("/api/health", new HealthHandler());
         server.createContext("/api/students/search", new SearchHandler());
+        server.createContext("/api/students", new StudentsHandler());
         server.createContext("/api/payments", new PaymentsHandler());
-        
-        server.setExecutor(null);
+
+        // Frontend/static files
+        server.createContext("/", new StaticFileHandler());
+
+        server.setExecutor(
+                Executors.newFixedThreadPool(
+                        Math.max(4,
+                                Runtime.getRuntime().availableProcessors() * 2)
+                )
+        );
+
         server.start();
-        System.out.println("🚀 PAL INDIA Web Server running flawlessly on http://localhost:8080");
+
+        System.out.println();
+        System.out.println("Server started successfully.");
+        System.out.println(
+                "Local URL: http://" + SERVER_HOST + ":" + SERVER_PORT
+        );
     }
 
-    // Globally shared method handling cross-origin infrastructure pipeline requests
-    public static void handleCORS(HttpExchange exchange) throws IOException {
-        exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
-        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
-        exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type,Authorization");
-        if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+    // ============================================================
+    // ENVIRONMENT
+    // ============================================================
+
+    private static String env(String name, String defaultValue) {
+        String value = System.getenv(name);
+
+        if (value == null || value.trim().isEmpty()) {
+            return defaultValue;
+        }
+
+        return value.trim();
+    }
+
+    // ============================================================
+    // DATABASE
+    // ============================================================
+
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(
+                DB_URL,
+                DB_USER,
+                DB_PASSWORD
+        );
+    }
+
+    // ============================================================
+    // COMMON HTTP HELPERS
+    // ============================================================
+
+    public static void securityHeaders(HttpExchange exchange) {
+
+        Headers h = exchange.getResponseHeaders();
+
+        h.set(
+                "X-Content-Type-Options",
+                "nosniff"
+        );
+
+        h.set(
+                "X-Frame-Options",
+                "DENY"
+        );
+
+        h.set(
+                "Referrer-Policy",
+                "strict-origin-when-cross-origin"
+        );
+
+        h.set(
+                "Permissions-Policy",
+                "camera=(), microphone=(), geolocation=()"
+        );
+
+        h.set(
+                "Cache-Control",
+                "no-store"
+        );
+    }
+
+    public static boolean handleOptions(HttpExchange exchange)
+            throws IOException {
+
+        securityHeaders(exchange);
+
+        if ("OPTIONS".equalsIgnoreCase(
+                exchange.getRequestMethod())) {
+
+            exchange.getResponseHeaders().set(
+                    "Access-Control-Allow-Origin",
+                    "*"
+            );
+
+            exchange.getResponseHeaders().set(
+                    "Access-Control-Allow-Methods",
+                    "GET,POST,PUT,OPTIONS"
+            );
+
+            exchange.getResponseHeaders().set(
+                    "Access-Control-Allow-Headers",
+                    "Content-Type,Authorization"
+            );
+
             exchange.sendResponseHeaders(204, -1);
             exchange.close();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public static String readBody(HttpExchange exchange)
+            throws IOException {
+
+        try (InputStream input =
+                     exchange.getRequestBody()) {
+
+            ByteArrayOutputStream output =
+                    new ByteArrayOutputStream();
+
+            byte[] buffer = new byte[8192];
+
+            int read;
+
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+
+            return output.toString(
+                    StandardCharsets.UTF_8
+            );
         }
     }
 
-    // Reader buffer script ensuring complete payload ingest cycles
-    public static String readRequestBody(HttpExchange exchange) throws IOException {
-        InputStream is = exchange.getRequestBody();
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        byte[] buffer = new byte[1024];
-        int length;
-        while ((length = is.read(buffer)) != -1) {
-            bos.write(buffer, 0, length);
+    public static void sendJson(
+            HttpExchange exchange,
+            int status,
+            String json) throws IOException {
+
+        securityHeaders(exchange);
+
+        Headers headers =
+                exchange.getResponseHeaders();
+
+        headers.set(
+                "Content-Type",
+                "application/json; charset=UTF-8"
+        );
+
+        headers.set(
+                "Access-Control-Allow-Origin",
+                "*"
+        );
+
+        byte[] bytes =
+                json.getBytes(StandardCharsets.UTF_8);
+
+        exchange.sendResponseHeaders(
+                status,
+                bytes.length
+        );
+
+        try (OutputStream output =
+                     exchange.getResponseBody()) {
+
+            output.write(bytes);
         }
-        return bos.toString(StandardCharsets.UTF_8.name());
     }
 
-    // Custom non-dependency text string splitter to build structured data key-value maps
-    public static Map<String, String> parseJsonSimple(String json) {
-        Map<String, String> map = new HashMap<>();
-        if (json == null || json.trim().isEmpty()) return map;
-        
-        json = json.trim();
-        if (json.startsWith("{")) json = json.substring(1);
-        if (json.endsWith("}")) json = json.substring(0, json.length() - 1);
-        
-        String[] pairs = json.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
-        for (String pair : pairs) {
-            String[] kv = pair.split(":(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
-            if (kv.length >= 2) {
-                String key = kv[0].trim().replace("\"", "");
-                String val = kv[1].trim().replace("\"", "");
-                map.put(key, val);
+    public static void sendError(
+            HttpExchange exchange,
+            int status,
+            String message) throws IOException {
+
+        sendJson(
+                exchange,
+                status,
+                "{\"success\":false,\"error\":"
+                        + Json.quote(message)
+                        + "}"
+        );
+    }
+
+    // ============================================================
+    // HEALTH CHECK
+    // ============================================================
+
+    static class HealthHandler implements HttpHandler {
+
+        @Override
+        public void handle(HttpExchange exchange)
+                throws IOException {
+
+            if (handleOptions(exchange)) {
+                return;
+            }
+
+            if (!"GET".equalsIgnoreCase(
+                    exchange.getRequestMethod())) {
+
+                sendError(
+                        exchange,
+                        405,
+                        "Method not allowed"
+                );
+
+                return;
+            }
+
+            try (Connection ignored = getConnection()) {
+
+                sendJson(
+                        exchange,
+                        200,
+                        "{\"success\":true,\"database\":\"connected\"}"
+                );
+
+            } catch (Exception e) {
+
+                sendJson(
+                        exchange,
+                        503,
+                        "{\"success\":false,\"database\":\"unavailable\"}"
+                );
             }
         }
-        return map;
     }
-}
-// --- COMPONENT HANDLER 1: EXECUTES REGISTER ENTRIES (POST) & RECORD MODIFICATIONS (PUT) ---
-class StudentsHandler implements HttpHandler {
-    public void handle(HttpExchange exchange) throws IOException {
-        Server.handleCORS(exchange);
-        String method = exchange.getRequestMethod();
-        String response = "{\"success\":false}";
-        int statusCode = 500;
 
-        // SUB-ROUTINE A: ADMISSIONS REGISTER ENGINE (MAPPED TO PART 1 JDIALOG ADMISSIONS)
-        if ("POST".equalsIgnoreCase(method)) {
-            try {
-                String rawBody = Server.readRequestBody(exchange);
-                Map<String, String> body = Server.parseJsonSimple(rawBody);
-                String query = "INSERT INTO student_records (name, mobile_no, address, course, bill, pending_balance, date_of_admission) VALUES (?, ?, ?, ?, ?, ?, ?)";
-                
-                try (Connection conn = DriverManager.getConnection(Server.DB_URL, Server.DB_USER, Server.DB_PASSWORD);
-                     PreparedStatement pstmt = conn.prepareStatement(query)) {
-                    String rawBill = body.getOrDefault("bill", "0");
-                    double billVal = !rawBill.isEmpty() ? Double.parseDouble(rawBill) : 0.0;
-                    
-                    pstmt.setString(1, body.get("name"));
-                    pstmt.setString(2, body.get("mobile_no"));
-                    pstmt.setString(3, body.get("address"));
-                    pstmt.setString(4, body.get("course"));
-                    pstmt.setDouble(5, billVal);
-                    pstmt.setDouble(6, billVal); // Set initial outstanding ledger figures to target bill cost
-                    pstmt.setString(7, body.get("date_of_admission"));
-                    
-                    pstmt.executeUpdate();
-                    response = "{\"success\":true}";
-                    statusCode = 200;
-                }
-            } catch (Exception e) {
-                response = "{\"success\":false,\"error\":\"" + e.getMessage().replace("\"", "\\\"") + "\"}";
-                statusCode = 400;
+    // ============================================================
+    // STUDENTS
+    // ============================================================
+
+    static class StudentsHandler implements HttpHandler {
+
+        @Override
+        public void handle(HttpExchange exchange)
+                throws IOException {
+
+            if (handleOptions(exchange)) {
+                return;
             }
-        } 
-        // SUB-ROUTINE B: GLOBAL PROFILE UPDATE MANAGER (MAPPED TO PART 5 MODIFICATION CODES)
-        else if ("PUT".equalsIgnoreCase(method)) {
+
+            String method =
+                    exchange.getRequestMethod();
+
             try {
-                String rawBody = Server.readRequestBody(exchange);
-                Map<String, String> body = Server.parseJsonSimple(rawBody);
 
-                int studentId = Integer.parseInt(body.get("id"));
-                String newName = body.get("name");
-                String newMobile = body.get("mobile_no");
-                String newAddress = body.get("address");
-                String newCourse = body.get("course");
-                double newBill = Double.parseDouble(body.get("bill"));
-                String notes = body.get("notes");
+                if ("POST".equalsIgnoreCase(method)) {
+                    createStudent(exchange);
 
-                try (Connection conn = DriverManager.getConnection(Server.DB_URL, Server.DB_USER, Server.DB_PASSWORD)) {
-                    // Pull current baseline statement details to solve calculation adjustments
-                    double oldBill = 0.0;
-                    try (PreparedStatement checkStmt = conn.prepareStatement("SELECT bill FROM student_records WHERE id = ?")) {
-                        checkStmt.setInt(1, studentId);
-                        try (ResultSet rs = checkStmt.executeQuery()) {
-                            if (rs.next()) { oldBill = rs.getDouble("bill"); }
-                        }
-                    }
+                } else if ("PUT".equalsIgnoreCase(method)) {
+                    updateStudent(exchange);
 
-                    // Mathematical variance block tracking debt metrics matching your Part 5 logic
-                    double billDiff = newBill - oldBill;
+                } else {
 
-                    String upSQL = "UPDATE student_records SET name=?, mobile_no=?, address=?, course=?, bill=?, pending_balance = pending_balance + ?, dynamic_notes=? WHERE id=?";
-                    try (PreparedStatement pstmt = conn.prepareStatement(upSQL)) {
-                        pstmt.setString(1, newName);
-                        pstmt.setString(2, newMobile);
-                        pstmt.setString(3, newAddress);
-                        pstmt.setString(4, newCourse);
-                        pstmt.setDouble(5, newBill);
-                        pstmt.setDouble(6, billDiff);
-                        pstmt.setString(7, notes);
-                        pstmt.setInt(8, studentId);
-                        
-                        pstmt.executeUpdate();
-                        response = "{\"success\":true}";
-                        statusCode = 200;
-                    }
+                    sendError(
+                            exchange,
+                            405,
+                            "Method not allowed"
+                    );
                 }
+
             } catch (Exception e) {
-                response = "{\"success\":false,\"error\":\"" + e.getMessage().replace("\"", "\\\"") + "\"}";
-                statusCode = 400;
-            }
-        }
 
-        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-        exchange.sendResponseHeaders(statusCode, responseBytes.length);
-        try (OutputStream os = exchange.getResponseBody()) { os.write(responseBytes); }
-        exchange.close();
-    }
-}
-// --- COMPONENT HANDLER 2: SEARCH REGISTER ARCHIVES BY MULTIPLE FIELDS (GET ROUTE) ---
-class SearchHandler implements HttpHandler {
-    public void handle(HttpExchange exchange) throws IOException {
-        Server.handleCORS(exchange);
-        if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-            try {
-                String queryParam = exchange.getRequestURI().getQuery();
-                String filterValue = "";
-                if (queryParam != null && queryParam.contains("filter=")) {
-                    filterValue = URLDecoder.decode(queryParam.split("filter=")[1], StandardCharsets.UTF_8.name());
-                }
-                
-                StringBuilder jsonResult = new StringBuilder("[");
-                // Core selective filter trace matching criteria parameters from Part 4
-                String query = "SELECT id, name, mobile_no, address, course, bill, pending_balance, dynamic_notes FROM student_records WHERE name LIKE ? OR course LIKE ? OR address LIKE ? ORDER BY id DESC";
-                
-                try (Connection conn = DriverManager.getConnection(Server.DB_URL, Server.DB_USER, Server.DB_PASSWORD);
-                     PreparedStatement pstmt = conn.prepareStatement(query)) {
-                    String pattern = "%" + filterValue + "%";
-                    pstmt.setString(1, pattern);
-                    pstmt.setString(2, pattern);
-                    pstmt.setString(3, pattern);
-                    
-                    try (ResultSet rs = pstmt.executeQuery()) {
-                        boolean first = true;
-                        while (rs.next()) {
-                            if (!first) jsonResult.append(",");
-                            
-                            // Load recent transaction arrays associated with this student's index
-                            StringBuilder historyJson = new StringBuilder("[");
-                            try (PreparedStatement txP = conn.prepareStatement("SELECT amount_paid, payment_date, remarks FROM fee_transactions WHERE student_id=? ORDER BY transaction_id ASC")) {
-                                txP.setInt(1, rs.getInt("id"));
-                                try (ResultSet txRs = txP.executeQuery()) {
-                                    boolean fTx = true;
-                                    while (txRs.next()) {
-                                        if (!fTx) historyJson.append(",");
-                                        historyJson.append(String.format(Locale.US, "{\"date\":\"%s\",\"remarks\":\"%s\",\"amount\":%.2f}",
-                                            txRs.getTimestamp("payment_date").toString().substring(0, 16), txRs.getString("remarks"), txRs.getDouble("amount_paid")));
-                                        fTx = false;
-                                    }
-                                }
-                            }
-                            historyJson.append("]");
-
-                            String notes = rs.getString("dynamic_notes") == null ? "" : rs.getString("dynamic_notes");
-
-                            jsonResult.append(String.format(Locale.US,
-                                "{\"id\":%d,\"name\":\"%s\",\"mobile_no\":\"%s\",\"address\":\"%s\",\"course\":\"%s\",\"bill\":%.2f,\"pending_balance\":%.2f,\"notes\":\"%s\",\"history\":%s}",
-                                rs.getInt("id"), rs.getString("name"), rs.getString("mobile_no"), 
-                                rs.getString("address"), rs.getString("course"), rs.getDouble("bill"), rs.getDouble("pending_balance"), notes, historyJson.toString()
-                            ));
-                            first = false;
-                        }
-                    }
-                }
-                jsonResult.append("]");
-                byte[] responseBytes = jsonResult.toString().getBytes(StandardCharsets.UTF_8);
-                exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-                exchange.sendResponseHeaders(200, responseBytes.length);
-                try (OutputStream os = exchange.getResponseBody()) { os.write(responseBytes); }
-            } catch (Exception e) {
                 e.printStackTrace();
-                exchange.sendResponseHeaders(500, -1);
-            } finally { exchange.close(); }
+
+                sendError(
+                        exchange,
+                        500,
+                        "Internal server error"
+                );
+            }
+        }
+
+        private void createStudent(
+                HttpExchange exchange) throws Exception {
+
+            Map<String, String> body =
+                    Json.parse(readBody(exchange));
+
+            String name =
+                    required(body, "name");
+
+            String mobile =
+                    required(body, "mobile_no");
+
+            String address =
+                    required(body, "address");
+
+            String course =
+                    required(body, "course");
+
+            double bill =
+                    parseMoney(
+                            body.getOrDefault(
+                                    "bill",
+                                    "0"
+                            )
+                    );
+
+            if (bill < 0) {
+                throw new IllegalArgumentException(
+                        "Bill cannot be negative"
+                );
+            }
+
+            String date =
+                    body.getOrDefault(
+                            "date_of_admission",
+                            null
+                    );
+
+            String sql =
+                    "INSERT INTO student_records " +
+                    "(name,mobile_no,address,course,bill," +
+                    "pending_balance,date_of_admission) " +
+                    "VALUES (?,?,?,?,?,?,?)";
+
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt =
+                         conn.prepareStatement(
+                                 sql,
+                                 Statement.RETURN_GENERATED_KEYS
+                         )) {
+
+                stmt.setString(1, name);
+                stmt.setString(2, mobile);
+                stmt.setString(3, address);
+                stmt.setString(4, course);
+                stmt.setDouble(5, bill);
+                stmt.setDouble(6, bill);
+                stmt.setString(7, date);
+
+                stmt.executeUpdate();
+
+                long id = -1;
+
+                try (ResultSet keys =
+                             stmt.getGeneratedKeys()) {
+
+                    if (keys.next()) {
+                        id = keys.getLong(1);
+                    }
+                }
+
+                sendJson(
+                        exchange,
+                        201,
+                        "{\"success\":true,\"id\":"
+                                + id
+                                + "}"
+                );
+            }
+        }
+
+        private void updateStudent(
+                HttpExchange exchange) throws Exception {
+
+            Map<String, String> body =
+                    Json.parse(readBody(exchange));
+
+            int id =
+                    Integer.parseInt(
+                            required(body, "id")
+                    );
+
+            String name =
+                    required(body, "name");
+
+            String mobile =
+                    required(body, "mobile_no");
+
+            String address =
+                    required(body, "address");
+
+            String course =
+                    required(body, "course");
+
+            double newBill =
+                    parseMoney(
+                            required(body, "bill")
+                    );
+
+            String notes =
+                    body.getOrDefault(
+                            "notes",
+                            ""
+                    );
+
+            if (newBill < 0) {
+                throw new IllegalArgumentException(
+                        "Bill cannot be negative"
+                );
+            }
+
+            try (Connection conn = getConnection()) {
+
+                conn.setAutoCommit(false);
+
+                try {
+
+                    double oldBill;
+
+                    double pendingBalance;
+
+                    String select =
+                            "SELECT bill,pending_balance " +
+                            "FROM student_records " +
+                            "WHERE id=? FOR UPDATE";
+
+                    try (PreparedStatement stmt =
+                                 conn.prepareStatement(select)) {
+
+                        stmt.setInt(1, id);
+
+                        try (ResultSet rs =
+                                     stmt.executeQuery()) {
+
+                            if (!rs.next()) {
+
+                                conn.rollback();
+
+                                sendError(
+                                        exchange,
+                                        404,
+                                        "Student not found"
+                                );
+
+                                return;
+                            }
+
+                            oldBill =
+                                    rs.getDouble("bill");
+
+                            pendingBalance =
+                                    rs.getDouble(
+                                            "pending_balance"
+                                    );
+                        }
+                    }
+
+                    double difference =
+                            newBill - oldBill;
+
+                    double newPending =
+                            pendingBalance + difference;
+
+                    if (newPending < 0) {
+                        conn.rollback();
+
+                        sendError(
+                                exchange,
+                                400,
+                                "Bill cannot be lower than the amount already paid"
+                        );
+
+                        return;
+                    }
+
+                    String update =
+                            "UPDATE student_records SET " +
+                            "name=?,mobile_no=?,address=?," +
+                            "course=?,bill=?," +
+                            "pending_balance=?," +
+                            "dynamic_notes=? " +
+                            "WHERE id=?";
+
+                    try (PreparedStatement stmt =
+                                 conn.prepareStatement(update)) {
+
+                        stmt.setString(1, name);
+                        stmt.setString(2, mobile);
+                        stmt.setString(3, address);
+                        stmt.setString(4, course);
+                        stmt.setDouble(5, newBill);
+                        stmt.setDouble(6, newPending);
+                        stmt.setString(7, notes);
+                        stmt.setInt(8, id);
+
+                        stmt.executeUpdate();
+                    }
+
+                    conn.commit();
+
+                    sendJson(
+                            exchange,
+                            200,
+                            "{\"success\":true}"
+                    );
+
+                } catch (Exception e) {
+
+                    conn.rollback();
+
+                    throw e;
+                }
+            }
         }
     }
-}
 
-// --- COMPONENT HANDLER 3: RECORDS MONTHLY FEES ACCOUNT TRANSACTIONS (POST ROUTE) ---
-class PaymentsHandler implements HttpHandler {
-    public void handle(HttpExchange exchange) throws IOException {
-        Server.handleCORS(exchange);
-        if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-            String response = "{\"success\":false}";
-            int statusCode = 500;
-            Connection conn = null;
+    // ============================================================
+    // SEARCH
+    // ============================================================
+
+    static class SearchHandler implements HttpHandler {
+
+        @Override
+        public void handle(HttpExchange exchange)
+                throws IOException {
+
+            if (handleOptions(exchange)) {
+                return;
+            }
+
+            if (!"GET".equalsIgnoreCase(
+                    exchange.getRequestMethod())) {
+
+                sendError(
+                        exchange,
+                        405,
+                        "Method not allowed"
+                );
+
+                return;
+            }
+
             try {
-                String rawBody = Server.readRequestBody(exchange);
-                Map<String, String> body = Server.parseJsonSimple(rawBody);
-                
-                int studentId = Integer.parseInt(body.get("id"));
-                double paymentAmount = Double.parseDouble(body.get("amount"));
-                String remarks = body.getOrDefault("remarks", "Installment Entry");
 
-                conn = DriverManager.getConnection(Server.DB_URL, Server.DB_USER, Server.DB_PASSWORD);
-                conn.setAutoCommit(false); // Enable strict ACID tracking parameters
+                Map<String, String> params =
+                        parseQuery(
+                                exchange.getRequestURI()
+                                        .getRawQuery()
+                        );
 
-                // Task A: Deduct pending figures value from profile record row
-                String updateQuery = "UPDATE student_records SET pending_balance = pending_balance - ? WHERE id = ?";
-                try (PreparedStatement pstmt1 = conn.prepareStatement(updateQuery)) {
-                    pstmt1.setDouble(1, paymentAmount);
-                    pstmt1.setInt(2, studentId);
-                    pstmt1.executeUpdate();
+                String filter =
+                        params.getOrDefault(
+                                "filter",
+                                ""
+                        );
+
+                String pattern =
+                        "%" + filter + "%";
+
+                String sql =
+                        "SELECT id,name,mobile_no,address," +
+                        "course,bill,pending_balance," +
+                        "dynamic_notes,date_of_admission " +
+                        "FROM student_records " +
+                        "WHERE name LIKE ? " +
+                        "OR mobile_no LIKE ? " +
+                        "OR course LIKE ? " +
+                        "OR address LIKE ? " +
+                        "ORDER BY id DESC";
+
+                StringBuilder result =
+                        new StringBuilder("[ ");
+
+                boolean first = true;
+
+                try (Connection conn = getConnection();
+                     PreparedStatement stmt =
+                             conn.prepareStatement(sql)) {
+
+                    stmt.setString(1, pattern);
+                    stmt.setString(2, pattern);
+                    stmt.setString(3, pattern);
+                    stmt.setString(4, pattern);
+
+                    try (ResultSet rs =
+                                 stmt.executeQuery()) {
+
+                        while (rs.next()) {
+
+                            if (!first) {
+                                result.append(",");
+                            }
+
+                            first = false;
+
+                            int id =
+                                    rs.getInt("id");
+
+                            result.append("{");
+
+                            result.append(
+                                    "\"id\":"
+                            ).append(id).append(",");
+
+                            result.append(
+                                    "\"name\":"
+                            ).append(
+                                    Json.quote(
+                                            rs.getString("name")
+                                    )
+                            ).append(",");
+
+                            result.append(
+                                    "\"mobile_no\":"
+                            ).append(
+                                    Json.quote(
+                                            rs.getString("mobile_no")
+                                    )
+                            ).append(",");
+
+                            result.append(
+                                    "\"address\":"
+                            ).append(
+                                    Json.quote(
+                                            rs.getString("address")
+                                    )
+                            ).append(",");
+
+                            result.append(
+                                    "\"course\":"
+                            ).append(
+                                    Json.quote(
+                                            rs.getString("course")
+                                    )
+                            ).append(",");
+
+                            result.append(
+                                    "\"bill\":"
+                            ).append(
+                                    money(
+                                            rs.getDouble("bill")
+                                    )
+                            ).append(",");
+
+                            result.append(
+                                    "\"pending_balance\":"
+                            ).append(
+                                    money(
+                                            rs.getDouble(
+                                                    "pending_balance"
+                                            )
+                                    )
+                            ).append(",");
+
+                            result.append(
+                                    "\"notes\":"
+                            ).append(
+                                    Json.quote(
+                                            rs.getString(
+                                                    "dynamic_notes"
+                                            )
+                                    )
+                            ).append(",");
+
+                            result.append(
+                                    "\"date_of_admission\":"
+                            ).append(
+                                    Json.quote(
+                                            rs.getString(
+                                                    "date_of_admission"
+                                            )
+                                    )
+                            ).append(",");
+
+                            result.append(
+                                    "\"history\":"
+                            );
+
+                            appendPaymentHistory(
+                                    conn,
+                                    id,
+                                    result
+                            );
+
+                            result.append("}");
+                        }
+                    }
                 }
 
-                // Task B: Insert row tracking point history into fee_transactions table matching Part 4
-                String insertTxQuery = "INSERT INTO fee_transactions (student_id, amount_paid, remarks) VALUES (?, ?, ?)";
-                try (PreparedStatement pstmt2 = conn.prepareStatement(insertTxQuery)) {
-                    pstmt2.setInt(1, studentId);
-                    pstmt2.setDouble(2, paymentAmount);
-                    pstmt2.setString(3, remarks);
-                    pstmt2.executeUpdate();
-                }
+                result.append(" ]");
 
-                conn.commit();
-                response = "{\"success\":true}";
-                statusCode = 200;
+                sendJson(
+                        exchange,
+                        200,
+                        result.toString()
+                );
+
             } catch (Exception e) {
-                if (conn != null) { try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); } }
-                response = "{\"success\":false,\"error\":\"" + e.getMessage().replace("\"", "\\\"") + "\"}";
-                statusCode = 400;
-            } finally {
-                if (conn != null) { try { conn.close(); } catch (SQLException ex) { ex.printStackTrace(); } }
-                byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
-                exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
-                exchange.sendResponseHeaders(statusCode, responseBytes.length);
-                try (OutputStream os = exchange.getResponseBody()) { os.write(responseBytes); }
-                exchange.close();
+
+                e.printStackTrace();
+
+                sendError(
+                        exchange,
+                        500,
+                        "Unable to search students"
+                );
+            }
+        }
+
+        private void appendPaymentHistory(
+                Connection conn,
+                int studentId,
+                StringBuilder result)
+                throws SQLException {
+
+            result.append("[");
+
+            String sql =
+                    "SELECT amount_paid,payment_date,remarks " +
+                    "FROM fee_transactions " +
+                    "WHERE student_id=? " +
+                    "ORDER BY transaction_id ASC";
+
+            boolean first = true;
+
+            try (PreparedStatement stmt =
+                         conn.prepareStatement(sql)) {
+
+                stmt.setInt(1, studentId);
+
+                try (ResultSet rs =
+                             stmt.executeQuery()) {
+
+                    while (rs.next()) {
+
+                        if (!first) {
+                            result.append(",");
+                        }
+
+                        first = false;
+
+                        Timestamp timestamp =
+                                rs.getTimestamp(
+                                        "payment_date"
+                                );
+
+                        String date =
+                                timestamp == null
+                                        ? ""
+                                        : timestamp.toString();
+
+                        result.append("{");
+
+                        result.append(
+                                "\"date\":"
+                        ).append(
+                                Json.quote(date)
+                        ).append(",");
+
+                        result.append(
+                                "\"remarks\":"
+                        ).append(
+                                Json.quote(
+                                        rs.getString(
+                                                "remarks"
+                                        )
+                                )
+                        ).append(",");
+
+                        result.append(
+                                "\"amount\":"
+                        ).append(
+                                money(
+                                        rs.getDouble(
+                                                "amount_paid"
+                                        )
+                                )
+                        );
+
+                        result.append("}");
+                    }
+                }
+            }
+
+            result.append("]");
+        }
+    }
+
+    // ============================================================
+    // PAYMENTS
+    // ============================================================
+
+    static class PaymentsHandler implements HttpHandler {
+
+        @Override
+        public void handle(HttpExchange exchange)
+                throws IOException {
+
+            if (handleOptions(exchange)) {
+                return;
+            }
+
+            if (!"POST".equalsIgnoreCase(
+                    exchange.getRequestMethod())) {
+
+                sendError(
+                        exchange,
+                        405,
+                        "Method not allowed"
+                );
+
+                return;
+            }
+
+            try {
+
+                Map<String, String> body =
+                        Json.parse(readBody(exchange));
+
+                int studentId =
+                        Integer.parseInt(
+                                required(body, "id")
+                        );
+
+                double payment =
+                        parseMoney(
+                                required(body, "amount")
+                        );
+
+                String remarks =
+                        body.getOrDefault(
+                                "remarks",
+                                "Installment Entry"
+                        );
+
+                if (payment <= 0) {
+
+                    sendError(
+                            exchange,
+                            400,
+                            "Payment amount must be greater than zero"
+                    );
+
+                    return;
+                }
+
+                try (Connection conn =
+                             getConnection()) {
+
+                    conn.setAutoCommit(false);
+
+                    try {
+
+                        double pending;
+
+                        String select =
+                                "SELECT pending_balance " +
+                                "FROM student_records " +
+                                "WHERE id=? FOR UPDATE";
+
+                        try (PreparedStatement stmt =
+                                     conn.prepareStatement(select)) {
+
+                            stmt.setInt(1, studentId);
+
+                            try (ResultSet rs =
+                                         stmt.executeQuery()) {
+
+                                if (!rs.next()) {
+
+                                    conn.rollback();
+
+                                    sendError(
+                                            exchange,
+                                            404,
+                                            "Student not found"
+                                    );
+
+                                    return;
+                                }
+
+                                pending =
+                                        rs.getDouble(
+                                                "pending_balance"
+                                        );
+                            }
+                        }
+
+                        if (payment > pending) {
+
+                            conn.rollback();
+
+                            sendError(
+                                    exchange,
+                                    400,
+                                    "Payment cannot exceed pending balance"
+                            );
+
+                            return;
+                        }
+
+                        String update =
+                                "UPDATE student_records " +
+                                "SET pending_balance=" +
+                                "pending_balance-? " +
+                                "WHERE id=?";
+
+                        try (PreparedStatement stmt =
+                                     conn.prepareStatement(update)) {
+
+                            stmt.setDouble(
+                                    1,
+                                    payment
+                            );
+
+                            stmt.setInt(
+                                    2,
+                                    studentId
+                            );
+
+                            stmt.executeUpdate();
+                        }
+
+                        String insert =
+                                "INSERT INTO fee_transactions " +
+                                "(student_id,amount_paid,remarks) " +
+                                "VALUES (?,?,?)";
+
+                        try (PreparedStatement stmt =
+                                     conn.prepareStatement(insert)) {
+
+                            stmt.setInt(
+                                    1,
+                                    studentId
+                            );
+
+                            stmt.setDouble(
+                                    2,
+                                    payment
+                            );
+
+                            stmt.setString(
+                                    3,
+                                    remarks
+                            );
+
+                            stmt.executeUpdate();
+                        }
+
+                        conn.commit();
+
+                        sendJson(
+                                exchange,
+                                200,
+                                "{\"success\":true}"
+                        );
+
+                    } catch (Exception e) {
+
+                        conn.rollback();
+
+                        throw e;
+                    }
+                }
+
+            } catch (NumberFormatException e) {
+
+                sendError(
+                        exchange,
+                        400,
+                        "Invalid student ID or payment amount"
+                );
+
+            } catch (Exception e) {
+
+                e.printStackTrace();
+
+                sendError(
+                        exchange,
+                        500,
+                        "Unable to process payment"
+                );
+            }
+        }
+    }
+
+    // ============================================================
+    // STATIC FILE SERVER
+    // ============================================================
+
+    static class StaticFileHandler implements HttpHandler {
+
+        @Override
+        public void handle(HttpExchange exchange)
+                throws IOException {
+
+            if (handleOptions(exchange)) {
+                return;
+            }
+
+            if (!"GET".equalsIgnoreCase(
+                    exchange.getRequestMethod())) {
+
+                sendError(
+                        exchange,
+                        405,
+                        "Method not allowed"
+                );
+
+                return;
+            }
+
+            String path =
+                    exchange.getRequestURI()
+                            .getPath();
+
+            if (path == null ||
+                    path.equals("/") ||
+                    path.isEmpty()) {
+
+                path = "/index.html";
+            }
+
+            // Prevent path traversal.
+            Path requested =
+                    PUBLIC_DIR.resolve(
+                            path.substring(
+                                    path.startsWith("/")
+                                            ? 1
+                                            : 0
+                            )
+                    ).normalize();
+
+            if (!requested.startsWith(
+                    PUBLIC_DIR)) {
+
+                sendError(
+                        exchange,
+                        403,
+                        "Forbidden"
+                );
+
+                return;
+            }
+
+            if (!Files.exists(requested) ||
+                    Files.isDirectory(requested)) {
+
+                sendError(
+                        exchange,
+                        404,
+                        "Page not found"
+                );
+
+                return;
+            }
+
+            byte[] data =
+                    Files.readAllBytes(requested);
+
+            String contentType =
+                    contentType(requested);
+
+            securityHeaders(exchange);
+
+            exchange.getResponseHeaders().set(
+                    "Content-Type",
+                    contentType
+            );
+
+            exchange.sendResponseHeaders(
+                    200,
+                    data.length
+            );
+
+            try (OutputStream output =
+                         exchange.getResponseBody()) {
+
+                output.write(data);
+            }
+        }
+
+        private String contentType(Path file) {
+
+            String name =
+                    file.getFileName()
+                            .toString()
+                            .toLowerCase();
+
+            if (name.endsWith(".html")) {
+                return "text/html; charset=UTF-8";
+            }
+
+            if (name.endsWith(".css")) {
+                return "text/css; charset=UTF-8";
+            }
+
+            if (name.endsWith(".js")) {
+                return "application/javascript; charset=UTF-8";
+            }
+
+            if (name.endsWith(".json")) {
+                return "application/json; charset=UTF-8";
+            }
+
+            if (name.endsWith(".png")) {
+                return "image/png";
+            }
+
+            if (name.endsWith(".jpg") ||
+                    name.endsWith(".jpeg")) {
+                return "image/jpeg";
+            }
+
+            if (name.endsWith(".svg")) {
+                return "image/svg+xml";
+            }
+
+            if (name.endsWith(".ico")) {
+                return "image/x-icon";
+            }
+
+            return "application/octet-stream";
+        }
+    }
+
+    // ============================================================
+    // VALIDATION
+    // ============================================================
+
+    private static String required(
+            Map<String, String> body,
+            String key) {
+
+        String value = body.get(key);
+
+        if (value == null ||
+                value.trim().isEmpty()) {
+
+            throw new IllegalArgumentException(
+                    "Missing required field: " + key
+            );
+        }
+
+        return value.trim();
+    }
+
+    private static double parseMoney(String value) {
+
+        double result =
+                Double.parseDouble(
+                        value.trim()
+                );
+
+        if (!Double.isFinite(result)) {
+            throw new IllegalArgumentException(
+                    "Invalid monetary value"
+            );
+        }
+
+        return result;
+    }
+
+    private static String money(double value) {
+
+        return String.format(
+                Locale.US,
+                "%.2f",
+                value
+        );
+    }
+
+    // ============================================================
+    // QUERY STRING
+    // ============================================================
+
+    private static Map<String, String> parseQuery(
+            String query)
+            throws UnsupportedEncodingException {
+
+        Map<String, String> result =
+                new HashMap<>();
+
+        if (query == null ||
+                query.isEmpty()) {
+
+            return result;
+        }
+
+        for (String pair :
+                query.split("&")) {
+
+            int equals =
+                    pair.indexOf('=');
+
+            if (equals < 0) {
+
+                result.put(
+                        URLDecoder.decode(
+                                pair,
+                                "UTF-8"
+                        ),
+                        ""
+                );
+
+                continue;
+            }
+
+            String key =
+                    URLDecoder.decode(
+                            pair.substring(
+                                    0,
+                                    equals
+                            ),
+                            "UTF-8"
+                    );
+
+            String value =
+                    URLDecoder.decode(
+                            pair.substring(
+                                    equals + 1
+                            ),
+                            "UTF-8"
+                    );
+
+            result.put(key, value);
+        }
+
+        return result;
+    }
+
+    // ============================================================
+    // MINIMAL JSON PARSER
+    // Supports strings, numbers, booleans and null.
+    // ============================================================
+
+    static class Json {
+
+        static Map<String, String> parse(
+                String input) {
+
+            Map<String, String> result =
+                    new HashMap<>();
+
+            if (input == null) {
+                return result;
+            }
+
+            Parser parser =
+                    new Parser(input);
+
+            parser.skipWhitespace();
+
+            if (parser.peek() != '{') {
+                throw new IllegalArgumentException(
+                        "JSON object expected"
+                );
+            }
+
+            parser.read();
+
+            parser.skipWhitespace();
+
+            if (parser.peek() == '}') {
+                parser.read();
+                return result;
+            }
+
+            while (true) {
+
+                parser.skipWhitespace();
+
+                String key =
+                        parser.readString();
+
+                parser.skipWhitespace();
+
+                if (parser.read() != ':') {
+                    throw new IllegalArgumentException(
+                            "Invalid JSON"
+                    );
+                }
+
+                parser.skipWhitespace();
+
+                String value =
+                        parser.readValue();
+
+                result.put(key, value);
+
+                parser.skipWhitespace();
+
+                char next =
+                        parser.read();
+
+                if (next == '}') {
+                    break;
+                }
+
+                if (next != ',') {
+                    throw new IllegalArgumentException(
+                            "Invalid JSON"
+                    );
+                }
+            }
+
+            return result;
+        }
+
+        static String quote(String value) {
+
+            if (value == null) {
+                return "null";
+            }
+
+            StringBuilder result =
+                    new StringBuilder("\"");
+
+            for (char c : value.toCharArray()) {
+
+                switch (c) {
+
+                    case '"':
+                        result.append("\\\"");
+                        break;
+
+                    case '\\':
+                        result.append("\\\\");
+                        break;
+
+                    case '\b':
+                        result.append("\\b");
+                        break;
+
+                    case '\f':
+                        result.append("\\f");
+                        break;
+
+                    case '\n':
+                        result.append("\\n");
+                        break;
+
+                    case '\r':
+                        result.append("\\r");
+                        break;
+
+                    case '\t':
+                        result.append("\\t");
+                        break;
+
+                    default:
+
+                        if (c < 32) {
+
+                            result.append(
+                                    String.format(
+                                            "\\u%04x",
+                                            (int) c
+                                    )
+                            );
+
+                        } else {
+
+                            result.append(c);
+                        }
+                }
+            }
+
+            result.append("\"");
+
+            return result.toString();
+        }
+
+        static class Parser {
+
+            private final String input;
+
+            private int position = 0;
+
+            Parser(String input) {
+                this.input = input.trim();
+            }
+
+            char peek() {
+
+                if (position >= input.length()) {
+                    return '\0';
+                }
+
+                return input.charAt(position);
+            }
+
+            char read() {
+
+                if (position >= input.length()) {
+                    throw new IllegalArgumentException(
+                            "Unexpected end of JSON"
+                    );
+                }
+
+                return input.charAt(position++);
+            }
+
+            void skipWhitespace() {
+
+                while (position <
+                        input.length() &&
+                        Character.isWhitespace(
+                                input.charAt(position))) {
+
+                    position++;
+                }
+            }
+
+            String readString() {
+
+                if (read() != '"') {
+                    throw new IllegalArgumentException(
+                            "JSON string expected"
+                    );
+                }
+
+                StringBuilder result =
+                        new StringBuilder();
+
+                while (position <
+                        input.length()) {
+
+                    char c = read();
+
+                    if (c == '"') {
+                        return result.toString();
+                    }
+
+                    if (c == '\\') {
+
+                        char escaped = read();
+
+                        switch (escaped) {
+
+                            case '"':
+                                result.append('"');
+                                break;
+
+                            case '\\':
+                                result.append('\\');
+                                break;
+
+                            case '/':
+                                result.append('/');
+                                break;
+
+                            case 'b':
+                                result.append('\b');
+                                break;
+
+                            case 'f':
+                                result.append('\f');
+                                break;
+
+                            case 'n':
+                                result.append('\n');
+                                break;
+
+                            case 'r':
+                                result.append('\r');
+                                break;
+
+                            case 't':
+                                result.append('\t');
+                                break;
+
+                            case 'u':
+
+                                String hex =
+                                        input.substring(
+                                                position,
+                                                position + 4
+                                        );
+
+                                result.append(
+                                        (char) Integer.parseInt(
+                                                hex,
+                                                16
+                                        )
+                                );
+
+                                position += 4;
+
+                                break;
+
+                            default:
+
+                                throw new IllegalArgumentException(
+                                        "Invalid JSON escape"
+                                );
+                        }
+
+                    } else {
+
+                        result.append(c);
+                    }
+                }
+
+                throw new IllegalArgumentException(
+                        "Unterminated JSON string"
+                );
+            }
+
+            String readValue() {
+
+                if (peek() == '"') {
+                    return readString();
+                }
+
+                int start = position;
+
+                while (position <
+                        input.length()) {
+
+                    char c =
+                            input.charAt(position);
+
+                    if (c == ',' ||
+                            c == '}' ||
+                            Character.isWhitespace(c)) {
+
+                        break;
+                    }
+
+                    position++;
+                }
+
+                String value =
+                        input.substring(
+                                start,
+                                position
+                        );
+
+                if ("null".equals(value)) {
+                    return "";
+                }
+
+                return value;
             }
         }
     }
