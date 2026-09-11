@@ -3,27 +3,33 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
-import java.io.*;
-import java.net.*;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.sql.*;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.Executors;
 
 public class Server {
 
-    /*
-     * Production configuration is read from environment variables.
-     *
-     * DB_HOST
-     * DB_PORT
-     * DB_NAME
-     * DB_USER
-     * DB_PASSWORD
-     * SERVER_HOST
-     * SERVER_PORT
-     */
+    // ============================================================
+    // CONFIGURATION
+    // ============================================================
 
     private static final String DB_HOST =
             env("DB_HOST", "127.0.0.1");
@@ -44,88 +50,249 @@ public class Server {
             env("SERVER_HOST", "127.0.0.1");
 
     private static final int SERVER_PORT =
-            Integer.parseInt(env("SERVER_PORT", "8080"));
+            parsePort(env("SERVER_PORT", "8080"));
 
+    /*
+     * IMPORTANT:
+     *
+     * Your project currently contains index.html in the root:
+     *
+     *     Server.java
+     *     index.html
+     *
+     * Therefore "." is used as the default public directory.
+     *
+     * If you create a public folder later, you can set:
+     *
+     * PUBLIC_DIR=public
+     */
     private static final Path PUBLIC_DIR =
-            Paths.get(env("PUBLIC_DIR", "public"))
-                 .toAbsolutePath()
-                 .normalize();
+            Paths.get(env("PUBLIC_DIR", "."))
+                    .toAbsolutePath()
+                    .normalize();
 
     public static final String DB_URL =
-            "jdbc:mysql://" + DB_HOST + ":" + DB_PORT + "/" + DB_NAME
-                    + "?useSSL=false"
-                    + "&serverTimezone=UTC"
-                    + "&characterEncoding=UTF-8";
+            "jdbc:mysql://" +
+            DB_HOST +
+            ":" +
+            DB_PORT +
+            "/" +
+            DB_NAME +
+            "?useSSL=false" +
+            "&serverTimezone=UTC" +
+            "&characterEncoding=UTF-8" +
+            "&allowPublicKeyRetrieval=true";
+
+    // ============================================================
+    // MAIN
+    // ============================================================
 
     public static void main(String[] args) throws Exception {
 
-        Class.forName("com.mysql.cj.jdbc.Driver");
-
+        System.out.println();
         System.out.println("========================================");
-        System.out.println(" PAL INDIA SERVER");
+        System.out.println("          PAL INDIA SERVER");
         System.out.println("========================================");
-        System.out.println("Database : " + DB_HOST + ":" + DB_PORT + "/" + DB_NAME);
-        System.out.println("Web      : " + SERVER_HOST + ":" + SERVER_PORT);
+        System.out.println("Database : " +
+                DB_HOST + ":" + DB_PORT + "/" + DB_NAME);
+        System.out.println("DB User  : " + DB_USER);
+        System.out.println("Web      : " +
+                SERVER_HOST + ":" + SERVER_PORT);
         System.out.println("Public   : " + PUBLIC_DIR);
         System.out.println("========================================");
 
-        // Verify database connection before starting.
-        try (Connection ignored =
-                     DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+        /*
+         * MySQL Connector/J 9.x supports JDBC 4 automatic driver
+         * loading, so Class.forName(...) is intentionally not used.
+         *
+         * The connector JAR must still be present on the runtime
+         * classpath.
+         */
 
-            System.out.println("Database connection: OK");
+        // --------------------------------------------------------
+        // Test database connection before starting HTTP server
+        // --------------------------------------------------------
+
+        try (Connection ignored = getConnection()) {
+
+            System.out.println(
+                    "Database connection: OK"
+            );
+
+        } catch (SQLException e) {
+
+            System.err.println();
+            System.err.println(
+                    "DATABASE CONNECTION FAILED"
+            );
+            System.err.println(
+                    "----------------------------------------"
+            );
+            System.err.println(
+                    "Host     : " + DB_HOST
+            );
+            System.err.println(
+                    "Port     : " + DB_PORT
+            );
+            System.err.println(
+                    "Database : " + DB_NAME
+            );
+            System.err.println(
+                    "User     : " + DB_USER
+            );
+            System.err.println();
+            System.err.println(
+                    "Check that:"
+            );
+            System.err.println(
+                    "1. MySQL is running."
+            );
+            System.err.println(
+                    "2. The database exists."
+            );
+            System.err.println(
+                    "3. The username/password are correct."
+            );
+            System.err.println(
+                    "4. mysql-connector-j-9.7.0.jar is on the classpath."
+            );
+            System.err.println();
+            System.err.println(
+                    "Original error: " + e.getMessage()
+            );
+
+            return;
         }
+
+        // --------------------------------------------------------
+        // Create HTTP server
+        // --------------------------------------------------------
 
         HttpServer server =
                 HttpServer.create(
-                        new InetSocketAddress(SERVER_HOST, SERVER_PORT),
+                        new InetSocketAddress(
+                                SERVER_HOST,
+                                SERVER_PORT
+                        ),
                         0
                 );
 
+        // --------------------------------------------------------
         // API endpoints
-        server.createContext("/api/health", new HealthHandler());
-        server.createContext("/api/students/search", new SearchHandler());
-        server.createContext("/api/students", new StudentsHandler());
-        server.createContext("/api/payments", new PaymentsHandler());
+        // --------------------------------------------------------
 
-        // Frontend/static files
-        server.createContext("/", new StaticFileHandler());
+        server.createContext(
+                "/api/health",
+                new HealthHandler()
+        );
+
+        server.createContext(
+                "/api/students/search",
+                new SearchHandler()
+        );
+
+        server.createContext(
+                "/api/students",
+                new StudentsHandler()
+        );
+
+        server.createContext(
+                "/api/payments",
+                new PaymentsHandler()
+        );
+
+        // --------------------------------------------------------
+        // Frontend
+        // --------------------------------------------------------
+
+        server.createContext(
+                "/",
+                new StaticFileHandler()
+        );
+
+        // --------------------------------------------------------
+        // Thread pool
+        // --------------------------------------------------------
+
+        int threads =
+                Math.max(
+                        4,
+                        Runtime.getRuntime()
+                                .availableProcessors() * 2
+                );
 
         server.setExecutor(
-                Executors.newFixedThreadPool(
-                        Math.max(4,
-                                Runtime.getRuntime().availableProcessors() * 2)
-                )
+                Executors.newFixedThreadPool(threads)
         );
 
         server.start();
 
         System.out.println();
-        System.out.println("Server started successfully.");
         System.out.println(
-                "Local URL: http://" + SERVER_HOST + ":" + SERVER_PORT
+                "Server started successfully."
         );
+        System.out.println(
+                "Open: http://" +
+                SERVER_HOST +
+                ":" +
+                SERVER_PORT
+        );
+        System.out.println();
     }
 
     // ============================================================
     // ENVIRONMENT
     // ============================================================
 
-    private static String env(String name, String defaultValue) {
-        String value = System.getenv(name);
+    private static String env(
+            String name,
+            String defaultValue) {
 
-        if (value == null || value.trim().isEmpty()) {
+        String value =
+                System.getenv(name);
+
+        if (value == null ||
+                value.trim().isEmpty()) {
+
             return defaultValue;
         }
 
         return value.trim();
     }
 
+    private static int parsePort(String value) {
+
+        try {
+
+            int port =
+                    Integer.parseInt(
+                            value.trim()
+                    );
+
+            if (port < 1 || port > 65535) {
+
+                throw new IllegalArgumentException(
+                        "Port must be between 1 and 65535"
+                );
+            }
+
+            return port;
+
+        } catch (NumberFormatException e) {
+
+            throw new IllegalArgumentException(
+                    "Invalid SERVER_PORT: " + value
+            );
+        }
+    }
+
     // ============================================================
     // DATABASE
     // ============================================================
 
-    public static Connection getConnection() throws SQLException {
+    public static Connection getConnection()
+            throws SQLException {
+
         return DriverManager.getConnection(
                 DB_URL,
                 DB_USER,
@@ -134,40 +301,47 @@ public class Server {
     }
 
     // ============================================================
-    // COMMON HTTP HELPERS
+    // HTTP SECURITY HEADERS
     // ============================================================
 
-    public static void securityHeaders(HttpExchange exchange) {
+    public static void securityHeaders(
+            HttpExchange exchange) {
 
-        Headers h = exchange.getResponseHeaders();
+        Headers headers =
+                exchange.getResponseHeaders();
 
-        h.set(
+        headers.set(
                 "X-Content-Type-Options",
                 "nosniff"
         );
 
-        h.set(
+        headers.set(
                 "X-Frame-Options",
                 "DENY"
         );
 
-        h.set(
+        headers.set(
                 "Referrer-Policy",
                 "strict-origin-when-cross-origin"
         );
 
-        h.set(
+        headers.set(
                 "Permissions-Policy",
                 "camera=(), microphone=(), geolocation=()"
         );
 
-        h.set(
+        headers.set(
                 "Cache-Control",
                 "no-store"
         );
     }
 
-    public static boolean handleOptions(HttpExchange exchange)
+    // ============================================================
+    // OPTIONS / CORS
+    // ============================================================
+
+    public static boolean handleOptions(
+            HttpExchange exchange)
             throws IOException {
 
         securityHeaders(exchange);
@@ -175,22 +349,29 @@ public class Server {
         if ("OPTIONS".equalsIgnoreCase(
                 exchange.getRequestMethod())) {
 
-            exchange.getResponseHeaders().set(
+            Headers headers =
+                    exchange.getResponseHeaders();
+
+            headers.set(
                     "Access-Control-Allow-Origin",
                     "*"
             );
 
-            exchange.getResponseHeaders().set(
+            headers.set(
                     "Access-Control-Allow-Methods",
                     "GET,POST,PUT,OPTIONS"
             );
 
-            exchange.getResponseHeaders().set(
+            headers.set(
                     "Access-Control-Allow-Headers",
                     "Content-Type,Authorization"
             );
 
-            exchange.sendResponseHeaders(204, -1);
+            exchange.sendResponseHeaders(
+                    204,
+                    -1
+            );
+
             exchange.close();
 
             return true;
@@ -199,7 +380,12 @@ public class Server {
         return false;
     }
 
-    public static String readBody(HttpExchange exchange)
+    // ============================================================
+    // READ REQUEST BODY
+    // ============================================================
+
+    public static String readBody(
+            HttpExchange exchange)
             throws IOException {
 
         try (InputStream input =
@@ -208,12 +394,18 @@ public class Server {
             ByteArrayOutputStream output =
                     new ByteArrayOutputStream();
 
-            byte[] buffer = new byte[8192];
+            byte[] buffer =
+                    new byte[8192];
 
             int read;
 
             while ((read = input.read(buffer)) != -1) {
-                output.write(buffer, 0, read);
+
+                output.write(
+                        buffer,
+                        0,
+                        read
+                );
             }
 
             return output.toString(
@@ -222,10 +414,15 @@ public class Server {
         }
     }
 
+    // ============================================================
+    // JSON RESPONSE
+    // ============================================================
+
     public static void sendJson(
             HttpExchange exchange,
             int status,
-            String json) throws IOException {
+            String json)
+            throws IOException {
 
         securityHeaders(exchange);
 
@@ -243,7 +440,9 @@ public class Server {
         );
 
         byte[] bytes =
-                json.getBytes(StandardCharsets.UTF_8);
+                json.getBytes(
+                        StandardCharsets.UTF_8
+                );
 
         exchange.sendResponseHeaders(
                 status,
@@ -257,17 +456,22 @@ public class Server {
         }
     }
 
+    // ============================================================
+    // ERROR RESPONSE
+    // ============================================================
+
     public static void sendError(
             HttpExchange exchange,
             int status,
-            String message) throws IOException {
+            String message)
+            throws IOException {
 
         sendJson(
                 exchange,
                 status,
-                "{\"success\":false,\"error\":"
-                        + Json.quote(message)
-                        + "}"
+                "{\"success\":false,\"error\":" +
+                        Json.quote(message) +
+                        "}"
         );
     }
 
@@ -275,10 +479,12 @@ public class Server {
     // HEALTH CHECK
     // ============================================================
 
-    static class HealthHandler implements HttpHandler {
+    static class HealthHandler
+            implements HttpHandler {
 
         @Override
-        public void handle(HttpExchange exchange)
+        public void handle(
+                HttpExchange exchange)
                 throws IOException {
 
             if (handleOptions(exchange)) {
@@ -297,12 +503,14 @@ public class Server {
                 return;
             }
 
-            try (Connection ignored = getConnection()) {
+            try (Connection ignored =
+                         getConnection()) {
 
                 sendJson(
                         exchange,
                         200,
-                        "{\"success\":true,\"database\":\"connected\"}"
+                        "{\"success\":true," +
+                                "\"database\":\"connected\"}"
                 );
 
             } catch (Exception e) {
@@ -310,7 +518,8 @@ public class Server {
                 sendJson(
                         exchange,
                         503,
-                        "{\"success\":false,\"database\":\"unavailable\"}"
+                        "{\"success\":false," +
+                                "\"database\":\"unavailable\"}"
                 );
             }
         }
@@ -320,10 +529,12 @@ public class Server {
     // STUDENTS
     // ============================================================
 
-    static class StudentsHandler implements HttpHandler {
+    static class StudentsHandler
+            implements HttpHandler {
 
         @Override
-        public void handle(HttpExchange exchange)
+        public void handle(
+                HttpExchange exchange)
                 throws IOException {
 
             if (handleOptions(exchange)) {
@@ -336,9 +547,11 @@ public class Server {
             try {
 
                 if ("POST".equalsIgnoreCase(method)) {
+
                     createStudent(exchange);
 
                 } else if ("PUT".equalsIgnoreCase(method)) {
+
                     updateStudent(exchange);
 
                 } else {
@@ -349,6 +562,14 @@ public class Server {
                             "Method not allowed"
                     );
                 }
+
+            } catch (IllegalArgumentException e) {
+
+                sendError(
+                        exchange,
+                        400,
+                        e.getMessage()
+                );
 
             } catch (Exception e) {
 
@@ -362,23 +583,42 @@ public class Server {
             }
         }
 
+        // ========================================================
+        // CREATE STUDENT
+        // ========================================================
+
         private void createStudent(
-                HttpExchange exchange) throws Exception {
+                HttpExchange exchange)
+                throws Exception {
 
             Map<String, String> body =
-                    Json.parse(readBody(exchange));
+                    Json.parse(
+                            readBody(exchange)
+                    );
 
             String name =
-                    required(body, "name");
+                    required(
+                            body,
+                            "name"
+                    );
 
             String mobile =
-                    required(body, "mobile_no");
+                    required(
+                            body,
+                            "mobile_no"
+                    );
 
             String address =
-                    required(body, "address");
+                    required(
+                            body,
+                            "address"
+                    );
 
             String course =
-                    required(body, "course");
+                    required(
+                            body,
+                            "course"
+                    );
 
             double bill =
                     parseMoney(
@@ -389,6 +629,7 @@ public class Server {
                     );
 
             if (bill < 0) {
+
                 throw new IllegalArgumentException(
                         "Bill cannot be negative"
                 );
@@ -397,7 +638,7 @@ public class Server {
             String date =
                     body.getOrDefault(
                             "date_of_admission",
-                            null
+                            ""
                     );
 
             String sql =
@@ -406,20 +647,58 @@ public class Server {
                     "pending_balance,date_of_admission) " +
                     "VALUES (?,?,?,?,?,?,?)";
 
-            try (Connection conn = getConnection();
+            try (Connection conn =
+                         getConnection();
                  PreparedStatement stmt =
                          conn.prepareStatement(
                                  sql,
                                  Statement.RETURN_GENERATED_KEYS
                          )) {
 
-                stmt.setString(1, name);
-                stmt.setString(2, mobile);
-                stmt.setString(3, address);
-                stmt.setString(4, course);
-                stmt.setDouble(5, bill);
-                stmt.setDouble(6, bill);
-                stmt.setString(7, date);
+                stmt.setString(
+                        1,
+                        name
+                );
+
+                stmt.setString(
+                        2,
+                        mobile
+                );
+
+                stmt.setString(
+                        3,
+                        address
+                );
+
+                stmt.setString(
+                        4,
+                        course
+                );
+
+                stmt.setDouble(
+                        5,
+                        bill
+                );
+
+                stmt.setDouble(
+                        6,
+                        bill
+                );
+
+                if (date.trim().isEmpty()) {
+
+                    stmt.setNull(
+                            7,
+                            java.sql.Types.VARCHAR
+                    );
+
+                } else {
+
+                    stmt.setString(
+                            7,
+                            date
+                    );
+                }
 
                 stmt.executeUpdate();
 
@@ -429,46 +708,74 @@ public class Server {
                              stmt.getGeneratedKeys()) {
 
                     if (keys.next()) {
-                        id = keys.getLong(1);
+
+                        id =
+                                keys.getLong(1);
                     }
                 }
 
                 sendJson(
                         exchange,
                         201,
-                        "{\"success\":true,\"id\":"
-                                + id
-                                + "}"
+                        "{\"success\":true," +
+                                "\"id\":" +
+                                id +
+                                "}"
                 );
             }
         }
 
+        // ========================================================
+        // UPDATE STUDENT
+        // ========================================================
+
         private void updateStudent(
-                HttpExchange exchange) throws Exception {
+                HttpExchange exchange)
+                throws Exception {
 
             Map<String, String> body =
-                    Json.parse(readBody(exchange));
+                    Json.parse(
+                            readBody(exchange)
+                    );
 
             int id =
-                    Integer.parseInt(
-                            required(body, "id")
+                    parseId(
+                            required(
+                                    body,
+                                    "id"
+                            )
                     );
 
             String name =
-                    required(body, "name");
+                    required(
+                            body,
+                            "name"
+                    );
 
             String mobile =
-                    required(body, "mobile_no");
+                    required(
+                            body,
+                            "mobile_no"
+                    );
 
             String address =
-                    required(body, "address");
+                    required(
+                            body,
+                            "address"
+                    );
 
             String course =
-                    required(body, "course");
+                    required(
+                            body,
+                            "course"
+                    );
 
             double newBill =
                     parseMoney(
-                            required(body, "bill")
+                            required(
+                                    body,
+                                    "bill"
+                            )
                     );
 
             String notes =
@@ -478,19 +785,20 @@ public class Server {
                     );
 
             if (newBill < 0) {
+
                 throw new IllegalArgumentException(
                         "Bill cannot be negative"
                 );
             }
 
-            try (Connection conn = getConnection()) {
+            try (Connection conn =
+                         getConnection()) {
 
                 conn.setAutoCommit(false);
 
                 try {
 
                     double oldBill;
-
                     double pendingBalance;
 
                     String select =
@@ -501,7 +809,10 @@ public class Server {
                     try (PreparedStatement stmt =
                                  conn.prepareStatement(select)) {
 
-                        stmt.setInt(1, id);
+                        stmt.setInt(
+                                1,
+                                id
+                        );
 
                         try (ResultSet rs =
                                      stmt.executeQuery()) {
@@ -520,7 +831,9 @@ public class Server {
                             }
 
                             oldBill =
-                                    rs.getDouble("bill");
+                                    rs.getDouble(
+                                            "bill"
+                                    );
 
                             pendingBalance =
                                     rs.getDouble(
@@ -533,9 +846,29 @@ public class Server {
                             newBill - oldBill;
 
                     double newPending =
-                            pendingBalance + difference;
+                            pendingBalance +
+                                    difference;
+
+                    /*
+                     * Example:
+                     *
+                     * Old bill = 10,000
+                     * Paid     = 3,000
+                     * Pending  = 7,000
+                     *
+                     * New bill = 8,000
+                     * New pending = 5,000
+                     *
+                     * This is allowed.
+                     *
+                     * New bill = 2,000
+                     * New pending = -1,000
+                     *
+                     * This is rejected.
+                     */
 
                     if (newPending < 0) {
+
                         conn.rollback();
 
                         sendError(
@@ -549,8 +882,11 @@ public class Server {
 
                     String update =
                             "UPDATE student_records SET " +
-                            "name=?,mobile_no=?,address=?," +
-                            "course=?,bill=?," +
+                            "name=?," +
+                            "mobile_no=?," +
+                            "address=?," +
+                            "course=?," +
+                            "bill=?," +
                             "pending_balance=?," +
                             "dynamic_notes=? " +
                             "WHERE id=?";
@@ -558,14 +894,45 @@ public class Server {
                     try (PreparedStatement stmt =
                                  conn.prepareStatement(update)) {
 
-                        stmt.setString(1, name);
-                        stmt.setString(2, mobile);
-                        stmt.setString(3, address);
-                        stmt.setString(4, course);
-                        stmt.setDouble(5, newBill);
-                        stmt.setDouble(6, newPending);
-                        stmt.setString(7, notes);
-                        stmt.setInt(8, id);
+                        stmt.setString(
+                                1,
+                                name
+                        );
+
+                        stmt.setString(
+                                2,
+                                mobile
+                        );
+
+                        stmt.setString(
+                                3,
+                                address
+                        );
+
+                        stmt.setString(
+                                4,
+                                course
+                        );
+
+                        stmt.setDouble(
+                                5,
+                                newBill
+                        );
+
+                        stmt.setDouble(
+                                6,
+                                newPending
+                        );
+
+                        stmt.setString(
+                                7,
+                                notes
+                        );
+
+                        stmt.setInt(
+                                8,
+                                id
+                        );
 
                         stmt.executeUpdate();
                     }
@@ -580,7 +947,10 @@ public class Server {
 
                 } catch (Exception e) {
 
-                    conn.rollback();
+                    try {
+                        conn.rollback();
+                    } catch (SQLException ignored) {
+                    }
 
                     throw e;
                 }
@@ -592,10 +962,12 @@ public class Server {
     // SEARCH
     // ============================================================
 
-    static class SearchHandler implements HttpHandler {
+    static class SearchHandler
+            implements HttpHandler {
 
         @Override
-        public void handle(HttpExchange exchange)
+        public void handle(
+                HttpExchange exchange)
                 throws IOException {
 
             if (handleOptions(exchange)) {
@@ -618,7 +990,8 @@ public class Server {
 
                 Map<String, String> params =
                         parseQuery(
-                                exchange.getRequestURI()
+                                exchange
+                                        .getRequestURI()
                                         .getRawQuery()
                         );
 
@@ -626,15 +999,22 @@ public class Server {
                         params.getOrDefault(
                                 "filter",
                                 ""
-                        );
+                        ).trim();
 
                 String pattern =
                         "%" + filter + "%";
 
                 String sql =
-                        "SELECT id,name,mobile_no,address," +
-                        "course,bill,pending_balance," +
-                        "dynamic_notes,date_of_admission " +
+                        "SELECT " +
+                        "id," +
+                        "name," +
+                        "mobile_no," +
+                        "address," +
+                        "course," +
+                        "bill," +
+                        "pending_balance," +
+                        "dynamic_notes," +
+                        "date_of_admission " +
                         "FROM student_records " +
                         "WHERE name LIKE ? " +
                         "OR mobile_no LIKE ? " +
@@ -643,18 +1023,36 @@ public class Server {
                         "ORDER BY id DESC";
 
                 StringBuilder result =
-                        new StringBuilder("[ ");
+                        new StringBuilder();
+
+                result.append("[");
 
                 boolean first = true;
 
-                try (Connection conn = getConnection();
+                try (Connection conn =
+                             getConnection();
                      PreparedStatement stmt =
                              conn.prepareStatement(sql)) {
 
-                    stmt.setString(1, pattern);
-                    stmt.setString(2, pattern);
-                    stmt.setString(3, pattern);
-                    stmt.setString(4, pattern);
+                    stmt.setString(
+                            1,
+                            pattern
+                    );
+
+                    stmt.setString(
+                            2,
+                            pattern
+                    );
+
+                    stmt.setString(
+                            3,
+                            pattern
+                    );
+
+                    stmt.setString(
+                            4,
+                            pattern
+                    );
 
                     try (ResultSet rs =
                                  stmt.executeQuery()) {
@@ -668,83 +1066,133 @@ public class Server {
                             first = false;
 
                             int id =
-                                    rs.getInt("id");
+                                    rs.getInt(
+                                            "id"
+                                    );
 
                             result.append("{");
 
                             result.append(
                                     "\"id\":"
-                            ).append(id).append(",");
+                            );
+
+                            result.append(
+                                    id
+                            );
+
+                            result.append(",");
 
                             result.append(
                                     "\"name\":"
-                            ).append(
+                            );
+
+                            result.append(
                                     Json.quote(
-                                            rs.getString("name")
+                                            rs.getString(
+                                                    "name"
+                                            )
                                     )
-                            ).append(",");
+                            );
+
+                            result.append(",");
 
                             result.append(
                                     "\"mobile_no\":"
-                            ).append(
+                            );
+
+                            result.append(
                                     Json.quote(
-                                            rs.getString("mobile_no")
+                                            rs.getString(
+                                                    "mobile_no"
+                                            )
                                     )
-                            ).append(",");
+                            );
+
+                            result.append(",");
 
                             result.append(
                                     "\"address\":"
-                            ).append(
+                            );
+
+                            result.append(
                                     Json.quote(
-                                            rs.getString("address")
+                                            rs.getString(
+                                                    "address"
+                                            )
                                     )
-                            ).append(",");
+                            );
+
+                            result.append(",");
 
                             result.append(
                                     "\"course\":"
-                            ).append(
+                            );
+
+                            result.append(
                                     Json.quote(
-                                            rs.getString("course")
+                                            rs.getString(
+                                                    "course"
+                                            )
                                     )
-                            ).append(",");
+                            );
+
+                            result.append(",");
 
                             result.append(
                                     "\"bill\":"
-                            ).append(
+                            );
+
+                            result.append(
                                     money(
-                                            rs.getDouble("bill")
+                                            rs.getDouble(
+                                                    "bill"
+                                            )
                                     )
-                            ).append(",");
+                            );
+
+                            result.append(",");
 
                             result.append(
                                     "\"pending_balance\":"
-                            ).append(
+                            );
+
+                            result.append(
                                     money(
                                             rs.getDouble(
                                                     "pending_balance"
                                             )
                                     )
-                            ).append(",");
+                            );
+
+                            result.append(",");
 
                             result.append(
                                     "\"notes\":"
-                            ).append(
+                            );
+
+                            result.append(
                                     Json.quote(
                                             rs.getString(
                                                     "dynamic_notes"
                                             )
                                     )
-                            ).append(",");
+                            );
+
+                            result.append(",");
 
                             result.append(
                                     "\"date_of_admission\":"
-                            ).append(
+                            );
+
+                            result.append(
                                     Json.quote(
                                             rs.getString(
                                                     "date_of_admission"
                                             )
                                     )
-                            ).append(",");
+                            );
+
+                            result.append(",");
 
                             result.append(
                                     "\"history\":"
@@ -761,7 +1209,7 @@ public class Server {
                     }
                 }
 
-                result.append(" ]");
+                result.append("]");
 
                 sendJson(
                         exchange,
@@ -781,6 +1229,10 @@ public class Server {
             }
         }
 
+        // ========================================================
+        // PAYMENT HISTORY
+        // ========================================================
+
         private void appendPaymentHistory(
                 Connection conn,
                 int studentId,
@@ -790,7 +1242,10 @@ public class Server {
             result.append("[");
 
             String sql =
-                    "SELECT amount_paid,payment_date,remarks " +
+                    "SELECT " +
+                    "amount_paid," +
+                    "payment_date," +
+                    "remarks " +
                     "FROM fee_transactions " +
                     "WHERE student_id=? " +
                     "ORDER BY transaction_id ASC";
@@ -800,7 +1255,10 @@ public class Server {
             try (PreparedStatement stmt =
                          conn.prepareStatement(sql)) {
 
-                stmt.setInt(1, studentId);
+                stmt.setInt(
+                        1,
+                        studentId
+                );
 
                 try (ResultSet rs =
                              stmt.executeQuery()) {
@@ -827,23 +1285,33 @@ public class Server {
 
                         result.append(
                                 "\"date\":"
-                        ).append(
+                        );
+
+                        result.append(
                                 Json.quote(date)
-                        ).append(",");
+                        );
+
+                        result.append(",");
 
                         result.append(
                                 "\"remarks\":"
-                        ).append(
+                        );
+
+                        result.append(
                                 Json.quote(
                                         rs.getString(
                                                 "remarks"
                                         )
                                 )
-                        ).append(",");
+                        );
+
+                        result.append(",");
 
                         result.append(
                                 "\"amount\":"
-                        ).append(
+                        );
+
+                        result.append(
                                 money(
                                         rs.getDouble(
                                                 "amount_paid"
@@ -864,10 +1332,12 @@ public class Server {
     // PAYMENTS
     // ============================================================
 
-    static class PaymentsHandler implements HttpHandler {
+    static class PaymentsHandler
+            implements HttpHandler {
 
         @Override
-        public void handle(HttpExchange exchange)
+        public void handle(
+                HttpExchange exchange)
                 throws IOException {
 
             if (handleOptions(exchange)) {
@@ -889,16 +1359,24 @@ public class Server {
             try {
 
                 Map<String, String> body =
-                        Json.parse(readBody(exchange));
+                        Json.parse(
+                                readBody(exchange)
+                        );
 
                 int studentId =
-                        Integer.parseInt(
-                                required(body, "id")
+                        parseId(
+                                required(
+                                        body,
+                                        "id"
+                                )
                         );
 
                 double payment =
                         parseMoney(
-                                required(body, "amount")
+                                required(
+                                        body,
+                                        "amount"
+                                )
                         );
 
                 String remarks =
@@ -935,7 +1413,10 @@ public class Server {
                         try (PreparedStatement stmt =
                                      conn.prepareStatement(select)) {
 
-                            stmt.setInt(1, studentId);
+                            stmt.setInt(
+                                    1,
+                                    studentId
+                            );
 
                             try (ResultSet rs =
                                          stmt.executeQuery()) {
@@ -973,10 +1454,14 @@ public class Server {
                             return;
                         }
 
+                        // ------------------------------------------------
+                        // Update pending balance
+                        // ------------------------------------------------
+
                         String update =
                                 "UPDATE student_records " +
-                                "SET pending_balance=" +
-                                "pending_balance-? " +
+                                "SET pending_balance = " +
+                                "pending_balance - ? " +
                                 "WHERE id=?";
 
                         try (PreparedStatement stmt =
@@ -992,8 +1477,20 @@ public class Server {
                                     studentId
                             );
 
-                            stmt.executeUpdate();
+                            int affected =
+                                    stmt.executeUpdate();
+
+                            if (affected != 1) {
+
+                                throw new SQLException(
+                                        "Student balance could not be updated"
+                                );
+                            }
                         }
+
+                        // ------------------------------------------------
+                        // Save transaction
+                        // ------------------------------------------------
 
                         String insert =
                                 "INSERT INTO fee_transactions " +
@@ -1031,7 +1528,10 @@ public class Server {
 
                     } catch (Exception e) {
 
-                        conn.rollback();
+                        try {
+                            conn.rollback();
+                        } catch (SQLException ignored) {
+                        }
 
                         throw e;
                     }
@@ -1043,6 +1543,14 @@ public class Server {
                         exchange,
                         400,
                         "Invalid student ID or payment amount"
+                );
+
+            } catch (IllegalArgumentException e) {
+
+                sendError(
+                        exchange,
+                        400,
+                        e.getMessage()
                 );
 
             } catch (Exception e) {
@@ -1062,10 +1570,12 @@ public class Server {
     // STATIC FILE SERVER
     // ============================================================
 
-    static class StaticFileHandler implements HttpHandler {
+    static class StaticFileHandler
+            implements HttpHandler {
 
         @Override
-        public void handle(HttpExchange exchange)
+        public void handle(
+                HttpExchange exchange)
                 throws IOException {
 
             if (handleOptions(exchange)) {
@@ -1084,26 +1594,33 @@ public class Server {
                 return;
             }
 
-            String path =
-                    exchange.getRequestURI()
+            String requestPath =
+                    exchange
+                            .getRequestURI()
                             .getPath();
 
-            if (path == null ||
-                    path.equals("/") ||
-                    path.isEmpty()) {
+            if (requestPath == null ||
+                    requestPath.isEmpty() ||
+                    "/".equals(requestPath)) {
 
-                path = "/index.html";
+                requestPath =
+                        "/index.html";
             }
 
-            // Prevent path traversal.
+            // Remove leading slash.
+            String relativePath =
+                    requestPath.startsWith("/")
+                            ? requestPath.substring(1)
+                            : requestPath;
+
             Path requested =
-                    PUBLIC_DIR.resolve(
-                            path.substring(
-                                    path.startsWith("/")
-                                            ? 1
-                                            : 0
-                            )
-                    ).normalize();
+                    PUBLIC_DIR
+                            .resolve(relativePath)
+                            .normalize();
+
+            // --------------------------------------------------------
+            // Prevent path traversal
+            // --------------------------------------------------------
 
             if (!requested.startsWith(
                     PUBLIC_DIR)) {
@@ -1117,8 +1634,11 @@ public class Server {
                 return;
             }
 
-            if (!Files.exists(requested) ||
-                    Files.isDirectory(requested)) {
+            // --------------------------------------------------------
+            // File does not exist
+            // --------------------------------------------------------
+
+            if (!Files.exists(requested)) {
 
                 sendError(
                         exchange,
@@ -1129,18 +1649,48 @@ public class Server {
                 return;
             }
 
-            byte[] data =
-                    Files.readAllBytes(requested);
+            if (Files.isDirectory(requested)) {
+
+                sendError(
+                        exchange,
+                        404,
+                        "Page not found"
+                );
+
+                return;
+            }
+
+            byte[] data;
+
+            try {
+
+                data =
+                        Files.readAllBytes(
+                                requested
+                        );
+
+            } catch (IOException e) {
+
+                sendError(
+                        exchange,
+                        500,
+                        "Unable to read file"
+                );
+
+                return;
+            }
 
             String contentType =
                     contentType(requested);
 
             securityHeaders(exchange);
 
-            exchange.getResponseHeaders().set(
-                    "Content-Type",
-                    contentType
-            );
+            exchange
+                    .getResponseHeaders()
+                    .set(
+                            "Content-Type",
+                            contentType
+                    );
 
             exchange.sendResponseHeaders(
                     200,
@@ -1154,44 +1704,75 @@ public class Server {
             }
         }
 
-        private String contentType(Path file) {
+        // ========================================================
+        // CONTENT TYPE
+        // ========================================================
+
+        private String contentType(
+                Path file) {
 
             String name =
                     file.getFileName()
                             .toString()
-                            .toLowerCase();
+                            .toLowerCase(
+                                    Locale.ROOT
+                            );
 
-            if (name.endsWith(".html")) {
+            if (name.endsWith(".html") ||
+                    name.endsWith(".htm")) {
+
                 return "text/html; charset=UTF-8";
             }
 
             if (name.endsWith(".css")) {
+
                 return "text/css; charset=UTF-8";
             }
 
             if (name.endsWith(".js")) {
+
                 return "application/javascript; charset=UTF-8";
             }
 
             if (name.endsWith(".json")) {
+
                 return "application/json; charset=UTF-8";
             }
 
             if (name.endsWith(".png")) {
+
                 return "image/png";
             }
 
             if (name.endsWith(".jpg") ||
                     name.endsWith(".jpeg")) {
+
                 return "image/jpeg";
             }
 
+            if (name.endsWith(".gif")) {
+
+                return "image/gif";
+            }
+
+            if (name.endsWith(".webp")) {
+
+                return "image/webp";
+            }
+
             if (name.endsWith(".svg")) {
+
                 return "image/svg+xml";
             }
 
             if (name.endsWith(".ico")) {
+
                 return "image/x-icon";
+            }
+
+            if (name.endsWith(".txt")) {
+
+                return "text/plain; charset=UTF-8";
             }
 
             return "application/octet-stream";
@@ -1206,7 +1787,8 @@ public class Server {
             Map<String, String> body,
             String key) {
 
-        String value = body.get(key);
+        String value =
+                body.get(key);
 
         if (value == null ||
                 value.trim().isEmpty()) {
@@ -1219,23 +1801,70 @@ public class Server {
         return value.trim();
     }
 
-    private static double parseMoney(String value) {
+    private static int parseId(
+            String value) {
 
-        double result =
-                Double.parseDouble(
-                        value.trim()
+        try {
+
+            int id =
+                    Integer.parseInt(
+                            value.trim()
+                    );
+
+            if (id <= 0) {
+
+                throw new IllegalArgumentException(
+                        "Invalid student ID"
                 );
+            }
 
-        if (!Double.isFinite(result)) {
+            return id;
+
+        } catch (NumberFormatException e) {
+
+            throw new IllegalArgumentException(
+                    "Invalid student ID"
+            );
+        }
+    }
+
+    private static double parseMoney(
+            String value) {
+
+        if (value == null ||
+                value.trim().isEmpty()) {
+
             throw new IllegalArgumentException(
                     "Invalid monetary value"
             );
         }
 
-        return result;
+        try {
+
+            double result =
+                    Double.parseDouble(
+                            value.trim()
+                    );
+
+            if (!Double.isFinite(result)) {
+
+                throw new IllegalArgumentException(
+                        "Invalid monetary value"
+                );
+            }
+
+            return result;
+
+        } catch (NumberFormatException e) {
+
+            throw new IllegalArgumentException(
+                    "Invalid monetary value"
+            );
+        }
     }
 
-    private static String money(double value) {
+    private static String money(
+            double value) {
 
         return String.format(
                 Locale.US,
@@ -1250,7 +1879,7 @@ public class Server {
 
     private static Map<String, String> parseQuery(
             String query)
-            throws UnsupportedEncodingException {
+            throws IOException {
 
         Map<String, String> result =
                 new HashMap<>();
@@ -1261,19 +1890,28 @@ public class Server {
             return result;
         }
 
-        for (String pair :
-                query.split("&")) {
+        String[] pairs =
+                query.split("&");
+
+        for (String pair : pairs) {
+
+            if (pair.isEmpty()) {
+                continue;
+            }
 
             int equals =
                     pair.indexOf('=');
 
             if (equals < 0) {
 
-                result.put(
+                String key =
                         URLDecoder.decode(
                                 pair,
                                 "UTF-8"
-                        ),
+                        );
+
+                result.put(
+                        key,
                         ""
                 );
 
@@ -1297,7 +1935,10 @@ public class Server {
                             "UTF-8"
                     );
 
-            result.put(key, value);
+            result.put(
+                    key,
+                    value
+            );
         }
 
         return result;
@@ -1305,10 +1946,13 @@ public class Server {
 
     // ============================================================
     // MINIMAL JSON PARSER
-    // Supports strings, numbers, booleans and null.
     // ============================================================
 
     static class Json {
+
+        // --------------------------------------------------------
+        // Parse JSON object
+        // --------------------------------------------------------
 
         static Map<String, String> parse(
                 String input) {
@@ -1316,8 +1960,12 @@ public class Server {
             Map<String, String> result =
                     new HashMap<>();
 
-            if (input == null) {
-                return result;
+            if (input == null ||
+                    input.trim().isEmpty()) {
+
+                throw new IllegalArgumentException(
+                        "Request body is empty"
+                );
             }
 
             Parser parser =
@@ -1326,6 +1974,7 @@ public class Server {
             parser.skipWhitespace();
 
             if (parser.peek() != '{') {
+
                 throw new IllegalArgumentException(
                         "JSON object expected"
                 );
@@ -1336,7 +1985,9 @@ public class Server {
             parser.skipWhitespace();
 
             if (parser.peek() == '}') {
+
                 parser.read();
+
                 return result;
             }
 
@@ -1344,14 +1995,22 @@ public class Server {
 
                 parser.skipWhitespace();
 
+                if (parser.peek() != '"') {
+
+                    throw new IllegalArgumentException(
+                            "JSON property name expected"
+                    );
+                }
+
                 String key =
                         parser.readString();
 
                 parser.skipWhitespace();
 
                 if (parser.read() != ':') {
+
                     throw new IllegalArgumentException(
-                            "Invalid JSON"
+                            "Invalid JSON: expected ':'"
                     );
                 }
 
@@ -1360,7 +2019,10 @@ public class Server {
                 String value =
                         parser.readValue();
 
-                result.put(key, value);
+                result.put(
+                        key,
+                        value
+                );
 
                 parser.skipWhitespace();
 
@@ -1368,58 +2030,106 @@ public class Server {
                         parser.read();
 
                 if (next == '}') {
+
                     break;
                 }
 
                 if (next != ',') {
+
                     throw new IllegalArgumentException(
-                            "Invalid JSON"
+                            "Invalid JSON: expected ',' or '}'"
                     );
                 }
+            }
+
+            parser.skipWhitespace();
+
+            if (!parser.isEnd()) {
+
+                throw new IllegalArgumentException(
+                        "Invalid JSON: unexpected data"
+                );
             }
 
             return result;
         }
 
-        static String quote(String value) {
+        // --------------------------------------------------------
+        // Quote JSON string
+        // --------------------------------------------------------
+
+        static String quote(
+                String value) {
 
             if (value == null) {
+
                 return "null";
             }
 
             StringBuilder result =
-                    new StringBuilder("\"");
+                    new StringBuilder();
 
-            for (char c : value.toCharArray()) {
+            result.append('"');
+
+            for (char c :
+                    value.toCharArray()) {
 
                 switch (c) {
 
                     case '"':
-                        result.append("\\\"");
+
+                        result.append(
+                                "\\\""
+                        );
+
                         break;
 
                     case '\\':
-                        result.append("\\\\");
+
+                        result.append(
+                                "\\\\"
+                        );
+
                         break;
 
                     case '\b':
-                        result.append("\\b");
+
+                        result.append(
+                                "\\b"
+                        );
+
                         break;
 
                     case '\f':
-                        result.append("\\f");
+
+                        result.append(
+                                "\\f"
+                        );
+
                         break;
 
                     case '\n':
-                        result.append("\\n");
+
+                        result.append(
+                                "\\n"
+                        );
+
                         break;
 
                     case '\r':
-                        result.append("\\r");
+
+                        result.append(
+                                "\\r"
+                        );
+
                         break;
 
                     case '\t':
-                        result.append("\\t");
+
+                        result.append(
+                                "\\t"
+                        );
+
                         break;
 
                     default:
@@ -1428,6 +2138,7 @@ public class Server {
 
                             result.append(
                                     String.format(
+                                            Locale.US,
                                             "\\u%04x",
                                             (int) c
                                     )
@@ -1437,58 +2148,94 @@ public class Server {
 
                             result.append(c);
                         }
+
+                        break;
                 }
             }
 
-            result.append("\"");
+            result.append('"');
 
             return result.toString();
         }
+
+        // ========================================================
+        // JSON PARSER
+        // ========================================================
 
         static class Parser {
 
             private final String input;
 
-            private int position = 0;
+            private int position;
 
             Parser(String input) {
-                this.input = input.trim();
+
+                this.input =
+                        input.trim();
+
+                this.position = 0;
+            }
+
+            boolean isEnd() {
+
+                return position >=
+                        input.length();
             }
 
             char peek() {
 
-                if (position >= input.length()) {
+                if (position >=
+                        input.length()) {
+
                     return '\0';
                 }
 
-                return input.charAt(position);
+                return input.charAt(
+                        position
+                );
             }
 
             char read() {
 
-                if (position >= input.length()) {
+                if (position >=
+                        input.length()) {
+
                     throw new IllegalArgumentException(
                             "Unexpected end of JSON"
                     );
                 }
 
-                return input.charAt(position++);
+                return input.charAt(
+                        position++
+                );
             }
 
             void skipWhitespace() {
 
                 while (position <
-                        input.length() &&
-                        Character.isWhitespace(
-                                input.charAt(position))) {
+                        input.length()) {
+
+                    char c =
+                            input.charAt(
+                                    position
+                            );
+
+                    if (!Character.isWhitespace(c)) {
+                        break;
+                    }
 
                     position++;
                 }
             }
 
+            // ----------------------------------------------------
+            // Read JSON string
+            // ----------------------------------------------------
+
             String readString() {
 
                 if (read() != '"') {
+
                     throw new IllegalArgumentException(
                             "JSON string expected"
                     );
@@ -1500,51 +2247,86 @@ public class Server {
                 while (position <
                         input.length()) {
 
-                    char c = read();
+                    char c =
+                            read();
 
                     if (c == '"') {
+
                         return result.toString();
                     }
 
                     if (c == '\\') {
 
-                        char escaped = read();
+                        if (position >=
+                                input.length()) {
+
+                            throw new IllegalArgumentException(
+                                    "Invalid JSON escape"
+                            );
+                        }
+
+                        char escaped =
+                                read();
 
                         switch (escaped) {
 
                             case '"':
+
                                 result.append('"');
+
                                 break;
 
                             case '\\':
+
                                 result.append('\\');
+
                                 break;
 
                             case '/':
+
                                 result.append('/');
+
                                 break;
 
                             case 'b':
+
                                 result.append('\b');
+
                                 break;
 
                             case 'f':
+
                                 result.append('\f');
+
                                 break;
 
                             case 'n':
+
                                 result.append('\n');
+
                                 break;
 
                             case 'r':
+
                                 result.append('\r');
+
                                 break;
 
                             case 't':
+
                                 result.append('\t');
+
                                 break;
 
                             case 'u':
+
+                                if (position + 4 >
+                                        input.length()) {
+
+                                    throw new IllegalArgumentException(
+                                            "Invalid Unicode escape"
+                                    );
+                                }
 
                                 String hex =
                                         input.substring(
@@ -1552,12 +2334,23 @@ public class Server {
                                                 position + 4
                                         );
 
-                                result.append(
-                                        (char) Integer.parseInt(
-                                                hex,
-                                                16
-                                        )
-                                );
+                                try {
+
+                                    result.append(
+                                            (char)
+                                                    Integer.parseInt(
+                                                            hex,
+                                                            16
+                                                    )
+                                    );
+
+                                } catch (
+                                        NumberFormatException e) {
+
+                                    throw new IllegalArgumentException(
+                                            "Invalid Unicode escape"
+                                    );
+                                }
 
                                 position += 4;
 
@@ -1581,19 +2374,27 @@ public class Server {
                 );
             }
 
+            // ----------------------------------------------------
+            // Read JSON value
+            // ----------------------------------------------------
+
             String readValue() {
 
                 if (peek() == '"') {
+
                     return readString();
                 }
 
-                int start = position;
+                int start =
+                        position;
 
                 while (position <
                         input.length()) {
 
                     char c =
-                            input.charAt(position);
+                            input.charAt(
+                                    position
+                            );
 
                     if (c == ',' ||
                             c == '}' ||
@@ -1605,13 +2406,26 @@ public class Server {
                     position++;
                 }
 
+                if (start == position) {
+
+                    throw new IllegalArgumentException(
+                            "JSON value expected"
+                    );
+                }
+
                 String value =
                         input.substring(
                                 start,
                                 position
                         );
 
+                /*
+                 * Convert JSON null to empty string because
+                 * this application uses String values internally.
+                 */
+
                 if ("null".equals(value)) {
+
                     return "";
                 }
 

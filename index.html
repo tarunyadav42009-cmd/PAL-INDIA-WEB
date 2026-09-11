@@ -2,411 +2,1746 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>PAL INDIA COMPUTER EDUCATION - Enterprise ERP Ledger</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>PAL INDIA COMPUTER EDUCATION - ERP</title>
+
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background-color: #f1f5f9; color: #1e293b; }
-        .wrapper { max-width: 1200px; margin: auto; }
-        
-        /* Navigation Top Bar layout styling context */
-        .brand-header { background: #1e3a8a; color: white; padding: 20px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-        .brand-header h1 { margin: 0; font-size: 24px; }
-        .brand-header span { font-size: 14px; opacity: 0.8; }
-        
-        /* Grid mapping out upper four active status tabs cards */
-        .tab-menu-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
-        .nav-card { background: white; padding: 20px; border-radius: 6px; border-top: 4px solid #cbd5e1; box-shadow: 0 4px 6px rgba(0,0,0,0.02); cursor: pointer; transition: transform 0.2s; }
-        .nav-card:hover { transform: translateY(-3px); }
-        .nav-card.active-tab-admissions { border-top-color: #10b981; }
-        .nav-card.active-tab-fees { border-top-color: #3b82f6; }
-        .nav-card.active-tab-search { border-top-color: #6366f1; }
-        .nav-card.active-tab-admin { border-top-color: #0f172a; }
-        .nav-card h3 { margin: 0 0 8px 0; color: #1e3a8a; }
-        .nav-card p { margin: 0; font-size: 13px; color: #64748b; line-height: 1.4; }
-        
-        /* Content workspace layouts classes rules */
-        .workspace-panel { background: white; padding: 30px; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); display: none; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
-        
-        /* Standard structural forms items mapping tags */
-        label { display: block; margin-top: 15px; font-weight: 600; font-size: 14px; }
-        input, select, textarea { width: 100%; padding: 10px; margin-top: 6px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px; }
-        button { margin-top: 20px; padding: 12px 24px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 14px; }
-        button:hover { background: #1d4ed8; }
-        
-        /* Registry data display archive grids */
-        .search-row { display: flex; gap: 15px; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; font-size: 14px; }
-        th { background: #0f172a; color: white; }
-        tr:hover { background: #f8fafc; }
-        
-        /* Modal tracking overlay style rules context */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; }
-        .modal-inner { background: white; width: 500px; margin: 100px auto; padding: 30px; border-radius: 6px; position: relative; }
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+
+        .wrapper {
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .brand-header {
+            background: #1e3a8a;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .brand-header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .brand-header span {
+            font-size: 14px;
+            opacity: .8;
+        }
+
+        .tab-menu-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .nav-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border-top: 4px solid #cbd5e1;
+            box-shadow: 0 4px 12px rgba(0,0,0,.05);
+            cursor: pointer;
+            transition: .2s;
+        }
+
+        .nav-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .nav-card.active-tab-admissions {
+            border-top-color: #10b981;
+        }
+
+        .nav-card.active-tab-fees {
+            border-top-color: #3b82f6;
+        }
+
+        .nav-card.active-tab-search {
+            border-top-color: #6366f1;
+        }
+
+        .nav-card.active-tab-admin {
+            border-top-color: #0f172a;
+        }
+
+        .nav-card h3 {
+            margin: 0 0 8px;
+            color: #1e3a8a;
+        }
+
+        .nav-card p {
+            margin: 0;
+            font-size: 13px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        .workspace-panel {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,.05);
+            display: none;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 11px;
+            margin-top: 6px;
+            border: 1px solid #cbd5e1;
+            border-radius: 5px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        input:focus,
+        textarea:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(37,99,235,.1);
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 12px 20px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        button:hover {
+            filter: brightness(.93);
+        }
+
+        button.secondary {
+            background: #64748b;
+        }
+
+        button.success {
+            background: #16a34a;
+        }
+
+        button.danger {
+            background: #dc2626;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .search-row input {
+            margin-top: 0;
+            flex: 1;
+        }
+
+        .search-row button {
+            margin-top: 0;
+            white-space: nowrap;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th,
+        td {
+            border: 1px solid #e2e8f0;
+            padding: 12px;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        th {
+            background: #0f172a;
+            color: white;
+            white-space: nowrap;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        .selected-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .status.success {
+            display: block;
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status.error {
+            display: block;
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,.55);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal-inner {
+            background: white;
+            width: min(500px, calc(100% - 30px));
+            margin: 60px auto;
+            padding: 30px;
+            border-radius: 8px;
+        }
+
+        .muted {
+            color: #64748b;
+        }
+
+        .small {
+            font-size: 12px;
+        }
+
+        @media (max-width: 900px) {
+            .tab-menu-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+
+            .brand-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .tab-menu-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .workspace-panel {
+                padding: 18px;
+            }
+
+            .search-row {
+                flex-direction: column;
+            }
+        }
     </style>
 </head>
+
 <body>
+
 <div class="wrapper">
 
     <div class="brand-header">
-        <h1>PAL INDIA COMPUTER EDUCATION</h1>
-        <span>Enterprise Portal Connected to Live MySQL Core</span>
+        <div>
+            <h1>PAL INDIA COMPUTER EDUCATION</h1>
+            <span>Student & Fee Management System</span>
+        </div>
+
+        <span id="connectionBadge">
+            Checking API...
+        </span>
     </div>
 
-    <!-- Active components tab dashboard menu mapping onclick router triggers -->
+    <!-- NAVIGATION -->
+
     <div class="tab-menu-grid">
-        <div class="nav-card active-tab-admissions" onclick="routeActiveTab('section-admissions')">
+
+        <div
+            class="nav-card active-tab-admissions"
+            onclick="routeActiveTab('section-admissions')">
+
             <h3>Admissions Hub</h3>
-            <p>Register new profiles and configure active institutional course pipelines.</p>
+
+            <p>
+                Register new students and course information.
+            </p>
         </div>
-        <div class="nav-card active-tab-fees" onclick="routeActiveTab('section-fees')">
+
+        <div
+            class="nav-card active-tab-fees"
+            onclick="routeActiveTab('section-fees')">
+
             <h3>Fees Structure</h3>
-            <p>Process monthly installments, review ledger records, and spool dynamic invoices.</p>
+
+            <p>
+                Select a student and record installment payments.
+            </p>
         </div>
-        <div class="nav-card active-tab-search" onclick="routeActiveTab('section-search')">
+
+        <div
+            class="nav-card active-tab-search"
+            onclick="routeActiveTab('section-search')">
+
             <h3>Search & Modify</h3>
-            <p>Filter database registries, view historical balances, and update profiles live.</p>
+
+            <p>
+                Search records and update student information.
+            </p>
         </div>
-        <div class="nav-card active-tab-admin" onclick="routeActiveTab('section-admin')">
+
+        <div
+            class="nav-card active-tab-admin"
+            onclick="routeActiveTab('section-admin')">
+
             <h3>Admin Panel</h3>
-            <p>Audit global workspace counts and database connection health.</p>
+
+            <p>
+                Check API and database status.
+            </p>
         </div>
-    </div>
-    <!-- ==================== TAB CONTENT SECTION 1: ADMISSIONS HUB ==================== -->
-    <div id="section-admissions" class="workspace-panel">
-        <h2>Pal India Admissions Office</h2>
-        <div style="max-width: 600px;">
-            <label>Student Name:</label>
-            <input type="text" id="student_name_input">
-            
-            <label>Mobile Number:</label>
-            <input type="text" id="mobile_no_input">
-            
-            <label>Address Location:</label>
-            <input type="text" id="address_input">
-            
-            <label>Enrolled Course:</label>
-            <input type="text" id="course_input">
-            
-            <label>Course Fee Bill (INR):</label>
-            <input type="number" step="0.01" id="bill_input">
-            
-            <label>Date of Admission:</label>
-            <input type="date" id="admission_date_input" value="2026-08-29">
-            
-            <button onclick="executeAdmissionPost()">Confirm SQL Insert</button>
-        </div>
+
     </div>
 
-    <!-- ==================== TAB CONTENT SECTION 2: FEES STRUCTURE ==================== -->
-    <div id="section-fees" class="workspace-panel">
-        <h2>Enterprise Monthly Installment Terminal</h2>
-        <div class="grid-2">
-            <div>
-                <h4 style="color:#2563eb; margin:0 0 10px 0;">Outstanding Target Scholar:</h4>
-                <p><strong>ID:</strong> <span id="terminal_id">None</span></p>
-                <p><strong>Scholar Name:</strong> <span id="terminal_name">Select a student from the left panel registry list to query invoice milestones.</span></p>
-                <p><strong>Course Assigned:</strong> <span id="terminal_course">None</span></p>
-            </div>
-            <div style="border-left: 1px solid #e2e8f0; padding-left: 30px;">
-                <label>Amount Paid:</label>
-                <input type="number" step="0.01" id="payment_amount_input">
-                
-                <label>Month / Remarks:</label>
-                <input type="text" id="payment_remarks_input" placeholder="Installment Entry">
-                
-                <button onclick="postPaymentTransaction()" style="background:#16a34a;">Post Payment Transaction</button>
-                <button onclick="alert('Spooling snapshot to device loop printer...')" style="background:#475569; margin-left:10px;">Execute System Print Pipeline</button>
-            </div>
-        </div>
-    </div>
 
-    <!-- ==================== TAB CONTENT SECTION 3: SEARCH & MODIFY ==================== -->
-    <div id="section-search" class="workspace-panel">
-        <h2>Production Database Ledger Audit Window</h2>
-        <p>💡 <em>Double-click any student row below to pull up the Modify Profiler dialog panel.</em></p>
-        
+    <!-- ADMISSIONS -->
+
+    <section
+        id="section-admissions"
+        class="workspace-panel">
+
+        <h2>Admissions Office</h2>
+
+        <div style="max-width:600px">
+
+            <label for="student_name_input">
+                Student Name
+            </label>
+
+            <input
+                type="text"
+                id="student_name_input"
+                maxlength="150"
+                autocomplete="name"
+            >
+
+            <label for="mobile_no_input">
+                Mobile Number
+            </label>
+
+            <input
+                type="text"
+                id="mobile_no_input"
+                maxlength="30"
+                autocomplete="tel"
+            >
+
+            <label for="address_input">
+                Address
+            </label>
+
+            <input
+                type="text"
+                id="address_input"
+                maxlength="500"
+            >
+
+            <label for="course_input">
+                Course
+            </label>
+
+            <input
+                type="text"
+                id="course_input"
+                maxlength="150"
+            >
+
+            <label for="bill_input">
+                Course Fee (INR)
+            </label>
+
+            <input
+                type="number"
+                step="0.01"
+                min="0"
+                id="bill_input"
+            >
+
+            <label for="admission_date_input">
+                Date of Admission
+            </label>
+
+            <input
+                type="date"
+                id="admission_date_input"
+            >
+
+            <button
+                onclick="executeAdmissionPost()">
+
+                Save Student
+            </button>
+
+            <div
+                id="admissionStatus"
+                class="status">
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- FEES -->
+
+    <section
+        id="section-fees"
+        class="workspace-panel">
+
+        <h2>Fee Payment</h2>
+
+        <div class="selected-box">
+
+            <strong>Selected Student</strong>
+
+            <p>
+                ID:
+                <span id="terminal_id">
+                    None
+                </span>
+            </p>
+
+            <p>
+                Name:
+                <span id="terminal_name">
+                    No student selected.
+                </span>
+            </p>
+
+            <p>
+                Course:
+                <span id="terminal_course">
+                    None
+                </span>
+            </p>
+
+            <p>
+                Pending:
+                <strong id="terminal_pending">
+                    ₹0.00
+                </strong>
+            </p>
+
+            <button
+                class="secondary"
+                onclick="routeActiveTab('section-search')">
+
+                Select Student From Search
+            </button>
+
+        </div>
+
+        <div style="max-width:600px">
+
+            <label for="payment_amount_input">
+                Amount Paid
+            </label>
+
+            <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                id="payment_amount_input"
+            >
+
+            <label for="payment_remarks_input">
+                Month / Remarks
+            </label>
+
+            <input
+                type="text"
+                id="payment_remarks_input"
+                maxlength="255"
+                placeholder="Installment Entry"
+            >
+
+            <button
+                class="success"
+                onclick="postPaymentTransaction()">
+
+                Post Payment
+            </button>
+
+            <div
+                id="paymentStatus"
+                class="status">
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- SEARCH -->
+
+    <section
+        id="section-search"
+        class="workspace-panel">
+
+        <h2>Student Database</h2>
+
+        <p class="muted">
+            Click a row to select the student.
+            Double-click to edit the student.
+        </p>
+
         <div class="search-row">
-            <input type="text" id="ledgerSearchFilter" placeholder="Dynamic Search Filter (Scholar / Program / Address)..." onkeyup="runLedgerQuery()">
-            <button onclick="runLedgerQuery()">Run Ledger Query</button>
+
+            <input
+                type="text"
+                id="ledgerSearchFilter"
+                placeholder="Search name, mobile, course or address..."
+                oninput="debouncedLedgerQuery()"
+            >
+
+            <button
+                onclick="runLedgerQuery()">
+
+                Search
+            </button>
+
         </div>
 
-        <table id="ledgerTableMatrix">
-            <thead>
+        <div class="table-wrap">
+
+            <table>
+
+                <thead>
+
                 <tr>
                     <th>ID</th>
-                    <th>Scholar Name</th>
-                    <th>Mobile Number</th>
-                    <th>Address Location</th>
-                    <th>Active Program</th>
-                    <th>Gross Base Cost</th>
-                    <th>Net Outstanding Due Balance</th>
-                    <th>Profile Notes</th>
+                    <th>Name</th>
+                    <th>Mobile</th>
+                    <th>Address</th>
+                    <th>Course</th>
+                    <th>Bill</th>
+                    <th>Pending</th>
+                    <th>Notes</th>
                 </tr>
-            </thead>
-            <tbody id="ledgerRowsContainer">
-                <!-- Javascript query loops append arrays seamlessly here -->
-            </tbody>
-        </table>
-    </div>
 
-    <!-- ==================== TAB CONTENT SECTION 4: ADMIN PANEL ==================== -->
-    <div id="section-admin" class="workspace-panel">
-        <h2>System Administration & Infrastructure Health</h2>
+                </thead>
+
+                <tbody id="ledgerRowsContainer">
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+
+    <!-- ADMIN -->
+
+    <section
+        id="section-admin"
+        class="workspace-panel">
+
+        <h2>System Administration</h2>
+
         <div class="grid-2">
-            <div style="background:#f8fafc; padding:20px; border-radius:4px; border:1px solid #e2e8f0;">
-                <h4>Database Link Server Status</h4>
-                <div id="db_status_badge" style="font-weight:bold; color:#ea580c; font-size:18px;">CHECKING...</div>
-                
-                <button onclick="runInfrastructureAudit()" style="background:#0f172a; margin-top:20px;">Run Live Infrastructure Audit Diagnostics</button>
-            </div>
-            <div style="background:#f8fafc; padding:20px; border-radius:4px; border:1px solid #e2e8f0;">
-                <p><strong>Total Enrolled Scholars Count:</strong> <span id="audit_scholars_count" style="font-weight:bold; font-size:18px; color:#2563eb;">0</span></p>
-                <p><strong>Active Programs Offered:</strong> <span id="audit_programs_count" style="font-weight:bold; font-size:18px; color:#2563eb;">0</span></p>
-            </div>
-        </div>
-    </div>
 
-    <!-- ==================== MODAL OVERLAY DIALOG WINDOW ==================== -->
-    <div id="modifyProfilerPanel" class="modal-overlay">
+            <div
+                style="
+                background:#f8fafc;
+                padding:20px;
+                border-radius:6px;
+                border:1px solid #e2e8f0;
+                ">
+
+                <h4>API / Database Status</h4>
+
+                <div
+                    id="db_status_badge"
+                    style="
+                    font-weight:bold;
+                    color:#ea580c;
+                    font-size:18px;
+                    ">
+
+                    CHECKING...
+
+                </div>
+
+                <button
+                    onclick="runInfrastructureAudit()">
+
+                    Run Health Check
+                </button>
+
+            </div>
+
+            <div
+                style="
+                background:#f8fafc;
+                padding:20px;
+                border-radius:6px;
+                border:1px solid #e2e8f0;
+                ">
+
+                <p>
+                    <strong>
+                        Total Students:
+                    </strong>
+
+                    <span
+                        id="audit_scholars_count"
+                        style="
+                        font-weight:bold;
+                        font-size:18px;
+                        color:#2563eb;
+                        ">
+
+                        0
+
+                    </span>
+                </p>
+
+                <p>
+                    <strong>
+                        Active Courses:
+                    </strong>
+
+                    <span
+                        id="audit_programs_count"
+                        style="
+                        font-weight:bold;
+                        font-size:18px;
+                        color:#2563eb;
+                        ">
+
+                        0
+
+                    </span>
+                </p>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- EDIT MODAL -->
+
+    <div
+        id="modifyProfilerPanel"
+        class="modal-overlay">
+
         <div class="modal-inner">
-            <h3>Modify Institutional Information Profiler</h3>
-            <input type="hidden" id="profiler_student_id">
-            
-            <label>Scholar Name:</label>
-            <input type="text" id="profiler_name">
-            
-            <label>Mobile Number:</label>
-            <input type="text" id="profiler_mobile">
-            
-            <label>Address Location:</label>
-            <input type="text" id="profiler_address">
-            
-            <label>Update Course:</label>
-            <input type="text" id="profiler_course">
-            
-            <label>Gross Tuition (INR):</label>
-            <input type="number" step="0.01" id="profiler_bill">
-            
-            <label>Profile Notes:</label>
-            <textarea id="profiler_notes" rows="3"></textarea>
-            
-            <div style="text-align: right; margin-top:20px;">
-                <button onclick="document.getElementById('modifyProfilerPanel').style.display='none'" style="background:#64748b; margin-right:10px;">Cancel</button>
-                <button onclick="saveGlobalUpdates()" style="background:#ea580c;">Save Global Updates</button>
+
+            <h3>
+                Edit Student
+            </h3>
+
+            <input
+                type="hidden"
+                id="profiler_student_id"
+            >
+
+            <label>
+                Name
+            </label>
+
+            <input
+                type="text"
+                id="profiler_name"
+                maxlength="150"
+            >
+
+            <label>
+                Mobile
+            </label>
+
+            <input
+                type="text"
+                id="profiler_mobile"
+                maxlength="30"
+            >
+
+            <label>
+                Address
+            </label>
+
+            <input
+                type="text"
+                id="profiler_address"
+                maxlength="500"
+            >
+
+            <label>
+                Course
+            </label>
+
+            <input
+                type="text"
+                id="profiler_course"
+                maxlength="150"
+            >
+
+            <label>
+                Gross Tuition
+            </label>
+
+            <input
+                type="number"
+                step="0.01"
+                min="0"
+                id="profiler_bill"
+            >
+
+            <label>
+                Profile Notes
+            </label>
+
+            <textarea
+                id="profiler_notes"
+                rows="3"
+                maxlength="1000">
+            </textarea>
+
+            <div
+                style="
+                text-align:right;
+                margin-top:20px;
+                ">
+
+                <button
+                    class="secondary"
+                    onclick="closeProfiler()">
+
+                    Cancel
+                </button>
+
+                <button
+                    class="success"
+                    onclick="saveGlobalUpdates()">
+
+                    Save Changes
+                </button>
+
             </div>
+
         </div>
+
     </div>
 
-</div> <!-- Wrapper End -->
+</div>
+
+
+<script src="api-config.js"></script>
+
 <script>
-    const API_BASE = "http://localhost:8080/api";
-    let activeSelectedScholarId = null;
 
-    // Trigger tab default configurations and date setup on window initialization
-    window.onload = function() {
-        const today = new Date().toISOString().split('T')[0];
-        const dateField = document.getElementById("admission_date_input");
-        if(dateField) dateField.value = today;
-        
-        routeActiveTab('section-admissions'); // Default show admissions on load
-        runInfrastructureAudit();
-    };
+    /*
+     * api-config.js defines:
+     *
+     * window.PAL_INDIA_API
+     *
+     * Local example:
+     * http://localhost:8080/api
+     *
+     * Later:
+     * https://your-railway-domain.up.railway.app/api
+     */
 
-    // 🗺️ INFRASTRUCTURE MODULE: HANDLES DYNAMIC CONTENT ROUTING TAB SWITCHES
-    function routeActiveTab(targetSectionId) {
-        const panels = document.querySelectorAll('.workspace-panel');
-        panels.forEach(panel => panel.style.display = 'none');
+    const API_BASE =
+        (
+            window.PAL_INDIA_API ||
+            (
+                location.hostname === "localhost" ||
+                location.hostname === "127.0.0.1"
+                    ? "http://localhost:8080/api"
+                    : "/api"
+            )
+        ).replace(/\/+$/, "");
 
-        const activePanel = document.getElementById(targetSectionId);
-        if(activePanel) {
-            activePanel.style.display = 'block';
-            if(targetSectionId === 'section-search') {
-                runLedgerQuery();
-            }
+    let activeSelectedScholar = null;
+
+    let searchTimer = null;
+
+
+    // ============================================================
+    // STARTUP
+    // ============================================================
+
+    window.addEventListener(
+        "DOMContentLoaded",
+        () => {
+
+            const today =
+                new Date()
+                    .toISOString()
+                    .split("T")[0];
+
+            document
+                .getElementById(
+                    "admission_date_input"
+                )
+                .value = today;
+
+            routeActiveTab(
+                "section-admissions"
+            );
+
+            runInfrastructureAudit();
+        }
+    );
+
+
+    // ============================================================
+    // NAVIGATION
+    // ============================================================
+
+    function routeActiveTab(
+        targetSectionId
+    ) {
+
+        document
+            .querySelectorAll(
+                ".workspace-panel"
+            )
+            .forEach(
+                panel => {
+                    panel.style.display = "none";
+                }
+            );
+
+        const active =
+            document.getElementById(
+                targetSectionId
+            );
+
+        if (!active) {
+            return;
+        }
+
+        active.style.display = "block";
+
+        if (
+            targetSectionId ===
+            "section-search"
+        ) {
+
+            runLedgerQuery();
         }
     }
 
-    // 🟢 FLOW 1: DISPATCH ADMISSION REGISTER ENTRIES (POST /api/students)
+
+    // ============================================================
+    // API REQUEST HELPER
+    // ============================================================
+
+    async function apiFetch(
+        path,
+        options = {}
+    ) {
+
+        const response =
+            await fetch(
+                API_BASE + path,
+                {
+                    ...options,
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                        ...(options.headers || {})
+                    }
+                }
+            );
+
+        let data = null;
+
+        try {
+            data = await response.json();
+        } catch (_) {
+            data = null;
+        }
+
+        if (!response.ok) {
+
+            throw new Error(
+                data?.error ||
+                `Server returned HTTP ${response.status}`
+            );
+        }
+
+        return data;
+    }
+
+
+    // ============================================================
+    // ADMISSION
+    // ============================================================
+
     async function executeAdmissionPost() {
+
         const payload = {
-            name: sanitize(document.getElementById("student_name_input").value),
-            mobile_no: sanitize(document.getElementById("mobile_no_input").value),
-            address: sanitize(document.getElementById("address_input").value),
-            course: sanitize(document.getElementById("course_input").value),
-            bill: sanitize(document.getElementById("bill_input").value || "0"),
-            date_of_admission: document.getElementById("admission_date_input").value
+
+            name:
+                valueOf(
+                    "student_name_input"
+                ),
+
+            mobile_no:
+                valueOf(
+                    "mobile_no_input"
+                ),
+
+            address:
+                valueOf(
+                    "address_input"
+                ),
+
+            course:
+                valueOf(
+                    "course_input"
+                ),
+
+            bill:
+                valueOf(
+                    "bill_input"
+                ) || "0",
+
+            date_of_admission:
+                valueOf(
+                    "admission_date_input"
+                )
         };
 
-        if(!payload.name || !payload.mobile_no) {
-            alert("⚠️ Name and Mobile validation strings cannot be blank!");
+        if (
+            !payload.name ||
+            !payload.mobile_no ||
+            !payload.address ||
+            !payload.course
+        ) {
+
+            showStatus(
+                "admissionStatus",
+                "Please fill Name, Mobile, Address and Course.",
+                false
+            );
+
             return;
         }
 
         try {
-            const res = await fetch(`${API_BASE}/students`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if(data.success) {
-                alert("🎉 Student saved successfully into MySQL!");
-                document.getElementById("student_name_input").value = "";
-                document.getElementById("mobile_no_input").value = "";
-                document.getElementById("address_input").value = "";
-                document.getElementById("course_input").value = "";
-                document.getElementById("bill_input").value = "";
-            } else {
-                alert("❌ Server rejected configuration: " + data.error);
+
+            const data =
+                await apiFetch(
+                    "/students",
+                    {
+                        method: "POST",
+                        body:
+                            JSON.stringify(
+                                payload
+                            )
+                    }
+                );
+
+            if (data.success) {
+
+                showStatus(
+                    "admissionStatus",
+                    `Student saved successfully. ID: ${data.id}`,
+                    true
+                );
+
+                clearAdmissionForm();
+
+                runInfrastructureAudit();
             }
-        } catch (err) {
-            alert("⚠️ Connection refused! Ensure Server.java is running.");
+
+        } catch (error) {
+
+            showStatus(
+                "admissionStatus",
+                error.message,
+                false
+            );
         }
     }
 
-    // 🔵 FLOW 2: DYNAMIC SEARCH FILTER QUERY SYSTEM (GET /api/students/search)
-    async function runLedgerQuery() {
-        const filterText = document.getElementById("ledgerSearchFilter").value;
-        try {
-            const res = await fetch(`${API_BASE}/students/search?filter=${encodeURIComponent(filterText)}`);
-            const records = await res.json();
-            
-            const container = document.getElementById("ledgerRowsContainer");
-            container.innerHTML = "";
 
-            if(records.length === 0) {
-                container.innerHTML = `<tr><td colspan="8" style="text-align:center; color:grey;">No matching database row structures found.</td></tr>`;
+    function clearAdmissionForm() {
+
+        document.getElementById(
+            "student_name_input"
+        ).value = "";
+
+        document.getElementById(
+            "mobile_no_input"
+        ).value = "";
+
+        document.getElementById(
+            "address_input"
+        ).value = "";
+
+        document.getElementById(
+            "course_input"
+        ).value = "";
+
+        document.getElementById(
+            "bill_input"
+        ).value = "";
+    }
+
+
+    // ============================================================
+    // SEARCH
+    // ============================================================
+
+    function debouncedLedgerQuery() {
+
+        clearTimeout(searchTimer);
+
+        searchTimer =
+            setTimeout(
+                runLedgerQuery,
+                300
+            );
+    }
+
+
+    async function runLedgerQuery() {
+
+        const filter =
+            valueOf(
+                "ledgerSearchFilter"
+            );
+
+        const container =
+            document.getElementById(
+                "ledgerRowsContainer"
+            );
+
+        container.textContent = "";
+
+        try {
+
+            const records =
+                await apiFetch(
+                    "/students/search?filter=" +
+                    encodeURIComponent(
+                        filter
+                    )
+                );
+
+            if (
+                !Array.isArray(records) ||
+                records.length === 0
+            ) {
+
+                const row =
+                    document.createElement("tr");
+
+                const cell =
+                    document.createElement("td");
+
+                cell.colSpan = 8;
+
+                cell.textContent =
+                    "No matching students found.";
+
+                cell.style.textAlign =
+                    "center";
+
+                cell.style.color =
+                    "grey";
+
+                row.appendChild(cell);
+
+                container.appendChild(row);
+
                 return;
             }
 
-            records.forEach(student => {
-                const tr = document.createElement("tr");
-                tr.style.cursor = "pointer";
-                tr.ondblclick = () => displayModifyProfilerPanel(student);
-                tr.innerHTML = `
-                    <td>${student.id}</td>
-                    <td><strong>${student.name}</strong></td>
-                    <td>${student.mobile_no}</td>
-                    <td>${student.address}</td>
-                    <td>${student.course}</td>
-                    <td>₹${student.bill.toFixed(2)}</td>
-                    <td style="color:${student.pending_balance > 0 ? '#dc2626' : '#16a34a'}; font-weight:bold;">₹${student.pending_balance.toFixed(2)}</td>
-                    <td><small>${student.notes || ''}</small></td>
-                `;
-                container.appendChild(tr);
-            });
-        } catch(err) {
-            console.error("Error drawing audit spreadsheet table rows:", err);
+            records.forEach(
+                student => {
+
+                    const row =
+                        document.createElement("tr");
+
+                    row.style.cursor =
+                        "pointer";
+
+                    row.addEventListener(
+                        "click",
+                        () => {
+                            selectStudent(
+                                student
+                            );
+                        }
+                    );
+
+                    row.addEventListener(
+                        "dblclick",
+                        () => {
+                            displayModifyProfilerPanel(
+                                student
+                            );
+                        }
+                    );
+
+                    appendCell(
+                        row,
+                        student.id
+                    );
+
+                    const nameCell =
+                        appendCell(
+                            row,
+                            student.name
+                        );
+
+                    nameCell.style.fontWeight =
+                        "bold";
+
+                    appendCell(
+                        row,
+                        student.mobile_no
+                    );
+
+                    appendCell(
+                        row,
+                        student.address
+                    );
+
+                    appendCell(
+                        row,
+                        student.course
+                    );
+
+                    appendCell(
+                        row,
+                        "₹" +
+                        moneyNumber(
+                            student.bill
+                        )
+                    );
+
+                    const pendingCell =
+                        appendCell(
+                            row,
+                            "₹" +
+                            moneyNumber(
+                                student.pending_balance
+                            )
+                        );
+
+                    pendingCell.style.color =
+                        Number(
+                            student.pending_balance
+                        ) > 0
+                            ? "#dc2626"
+                            : "#16a34a";
+
+                    pendingCell.style.fontWeight =
+                        "bold";
+
+                    appendCell(
+                        row,
+                        student.notes || ""
+                    );
+
+                    container.appendChild(
+                        row
+                    );
+                }
+            );
+
+        } catch (error) {
+
+            const row =
+                document.createElement("tr");
+
+            const cell =
+                document.createElement("td");
+
+            cell.colSpan = 8;
+
+            cell.textContent =
+                "Unable to load database: " +
+                error.message;
+
+            cell.style.color =
+                "#dc2626";
+
+            row.appendChild(cell);
+
+            container.appendChild(row);
         }
     }
 
-    // INTERCEPT ENGINE HYDRATING DOUBLE CLICK OPERATIONS
-    function displayModifyProfilerPanel(student) {
-        document.getElementById("modifyProfilerPanel").style.display = "block";
-        document.getElementById("profiler_student_id").value = student.id;
-        document.getElementById("profiler_name").value = student.name;
-        document.getElementById("profiler_mobile").value = student.mobile_no;
-        document.getElementById("profiler_address").value = student.address;
-        document.getElementById("profiler_course").value = student.course;
-        document.getElementById("profiler_bill").value = student.bill;
-        document.getElementById("profiler_notes").value = student.notes || "";
+
+    function appendCell(
+        row,
+        value
+    ) {
+
+        const cell =
+            document.createElement("td");
+
+        cell.textContent =
+            value == null
+                ? ""
+                : String(value);
+
+        row.appendChild(cell);
+
+        return cell;
     }
 
-    // 🟣 FLOW 3: MODIFY PROFILE RECORD LOGIC (PUT /api/students)
+
+    // ============================================================
+    // STUDENT SELECTION
+    // ============================================================
+
+    function selectStudent(
+        student
+    ) {
+
+        activeSelectedScholar =
+            student;
+
+        document.getElementById(
+            "terminal_id"
+        ).textContent =
+            student.id;
+
+        document.getElementById(
+            "terminal_name"
+        ).textContent =
+            student.name;
+
+        document.getElementById(
+            "terminal_course"
+        ).textContent =
+            student.course;
+
+        document.getElementById(
+            "terminal_pending"
+        ).textContent =
+            "₹" +
+            moneyNumber(
+                student.pending_balance
+            );
+
+        routeActiveTab(
+            "section-fees"
+        );
+    }
+
+
+    // ============================================================
+    // EDIT STUDENT
+    // ============================================================
+
+    function displayModifyProfilerPanel(
+        student
+    ) {
+
+        document.getElementById(
+            "modifyProfilerPanel"
+        ).style.display =
+            "block";
+
+        document.getElementById(
+            "profiler_student_id"
+        ).value =
+            student.id;
+
+        document.getElementById(
+            "profiler_name"
+        ).value =
+            student.name || "";
+
+        document.getElementById(
+            "profiler_mobile"
+        ).value =
+            student.mobile_no || "";
+
+        document.getElementById(
+            "profiler_address"
+        ).value =
+            student.address || "";
+
+        document.getElementById(
+            "profiler_course"
+        ).value =
+            student.course || "";
+
+        document.getElementById(
+            "profiler_bill"
+        ).value =
+            student.bill || 0;
+
+        document.getElementById(
+            "profiler_notes"
+        ).value =
+            student.notes || "";
+    }
+
+
+    function closeProfiler() {
+
+        document.getElementById(
+            "modifyProfilerPanel"
+        ).style.display =
+            "none";
+    }
+
+
     async function saveGlobalUpdates() {
+
         const payload = {
-            id: document.getElementById("profiler_student_id").value,
-            name: sanitize(document.getElementById("profiler_name").value),
-            mobile_no: sanitize(document.getElementById("profiler_mobile").value),
-            address: sanitize(document.getElementById("profiler_address").value),
-            course: sanitize(document.getElementById("profiler_course").value),
-            bill: sanitize(document.getElementById("profiler_bill").value || "0"),
-            notes: sanitize(document.getElementById("profiler_notes").value)
+
+            id:
+                valueOf(
+                    "profiler_student_id"
+                ),
+
+            name:
+                valueOf(
+                    "profiler_name"
+                ),
+
+            mobile_no:
+                valueOf(
+                    "profiler_mobile"
+                ),
+
+            address:
+                valueOf(
+                    "profiler_address"
+                ),
+
+            course:
+                valueOf(
+                    "profiler_course"
+                ),
+
+            bill:
+                valueOf(
+                    "profiler_bill"
+                ) || "0",
+
+            notes:
+                valueOf(
+                    "profiler_notes"
+                )
         };
 
-        try {
-            const res = await fetch(`${API_BASE}/students`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if(data.success) {
-                alert("🔄 Row indexes modified securely inside live database framework!");
-                document.getElementById("modifyProfilerPanel").style.display = "none";
-                runLedgerQuery();
-            }
-        } catch(err) {
-            alert("Error dispatching PUT dataset variables.");
-        }
-    }
+        if (
+            !payload.name ||
+            !payload.mobile_no ||
+            !payload.address ||
+            !payload.course
+        ) {
 
-    // 🟠 FLOW 4: DISPATCH PAYMENT HISTORY TRANSACTIONS (POST /api/payments)
-    async function postPaymentTransaction() {
-        // Target an active selection from rows dynamically if needed, or query manually
-        const searchVal = document.getElementById("ledgerSearchFilter").value;
-        const checkRes = await fetch(`${API_BASE}/students/search?filter=${encodeURIComponent(searchVal)}`);
-        const list = await checkRes.json();
-        
-        if(list.length === 0) {
-            alert("Query an active student profile inside Search tab to hook their ID.");
+            alert(
+                "Please complete all required student fields."
+            );
+
             return;
         }
-        
-        const target = list[0]; // Auto-binds transaction calculations against recent search match row
+
+        try {
+
+            const data =
+                await apiFetch(
+                    "/students",
+                    {
+                        method: "PUT",
+                        body:
+                            JSON.stringify(
+                                payload
+                            )
+                    }
+                );
+
+            if (data.success) {
+
+                closeProfiler();
+
+                await runLedgerQuery();
+
+                showStatus(
+                    "paymentStatus",
+                    "Student updated successfully.",
+                    true
+                );
+            }
+
+        } catch (error) {
+
+            alert(
+                "Unable to update student: " +
+                error.message
+            );
+        }
+    }
+
+
+    // ============================================================
+    // PAYMENTS
+    // ============================================================
+
+    async function postPaymentTransaction() {
+
+        if (!activeSelectedScholar) {
+
+            showStatus(
+                "paymentStatus",
+                "Select a student from Search & Modify first.",
+                false
+            );
+
+            return;
+        }
+
+        const amount =
+            valueOf(
+                "payment_amount_input"
+            );
+
+        if (!amount ||
+            Number(amount) <= 0) {
+
+            showStatus(
+                "paymentStatus",
+                "Enter a valid payment amount.",
+                false
+            );
+
+            return;
+        }
+
         const payload = {
-            id: target.id.toString(),
-            amount: document.getElementById("payment_amount_input").value,
-            remarks: document.getElementById("payment_remarks_input").value || "Installment Entry"
+
+            id:
+                String(
+                    activeSelectedScholar.id
+                ),
+
+            amount:
+
+                amount,
+
+            remarks:
+                valueOf(
+                    "payment_remarks_input"
+                ) ||
+                "Installment Entry"
         };
 
         try {
-            const res = await fetch(`${API_BASE}/payments`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if(data.success) {
-                alert("✅ Payment Transaction posted successfully. Ledger tracking balanced!");
-                document.getElementById("payment_amount_input").value = "";
-                document.getElementById("payment_remarks_input").value = "";
+
+            const data =
+                await apiFetch(
+                    "/payments",
+                    {
+                        method: "POST",
+                        body:
+                            JSON.stringify(
+                                payload
+                            )
+                    }
+                );
+
+            if (data.success) {
+
+                showStatus(
+                    "paymentStatus",
+                    "Payment posted successfully.",
+                    true
+                );
+
+                document.getElementById(
+                    "payment_amount_input"
+                ).value = "";
+
+                document.getElementById(
+                    "payment_remarks_input"
+                ).value = "";
+
+                // Refresh selected student.
+                await refreshSelectedStudent();
+
+                runInfrastructureAudit();
             }
-        } catch(err) {
-            alert("Transaction tracking pipeline error.");
+
+        } catch (error) {
+
+            showStatus(
+                "paymentStatus",
+                error.message,
+                false
+            );
         }
     }
 
-    // ⚪ FLOW 5: WORKSPACE COUNTS AUDIT DIAGNOSTICS
+
+    async function refreshSelectedStudent() {
+
+        if (!activeSelectedScholar) {
+            return;
+        }
+
+        const records =
+            await apiFetch(
+                "/students/search?filter=" +
+                encodeURIComponent(
+                    String(
+                        activeSelectedScholar.id
+                    )
+                )
+            );
+
+        const updated =
+            records.find(
+                student =>
+                    Number(student.id) ===
+                    Number(
+                        activeSelectedScholar.id
+                    )
+            );
+
+        if (updated) {
+
+            activeSelectedScholar =
+                updated;
+
+            document.getElementById(
+                "terminal_pending"
+            ).textContent =
+                "₹" +
+                moneyNumber(
+                    updated.pending_balance
+                );
+        }
+    }
+
+
+    // ============================================================
+    // HEALTH / ADMIN
+    // ============================================================
+
     async function runInfrastructureAudit() {
-        const badge = document.getElementById("db_status_badge");
-        badge.innerText = "CHECKING...";
-        badge.style.color = "#ea580c";
+
+        const badge =
+            document.getElementById(
+                "db_status_badge"
+            );
+
+        const connectionBadge =
+            document.getElementById(
+                "connectionBadge"
+            );
+
+        badge.textContent =
+            "CHECKING...";
+
+        badge.style.color =
+            "#ea580c";
+
+        connectionBadge.textContent =
+            "Checking API...";
 
         try {
-            const res = await fetch(`${API_BASE}/students/search?filter=`);
-            if(res.ok) {
-                const students = await res.json();
-                badge.innerText = "ONLINE (LIVE ACTIVE LINK)";
-                badge.style.color = "#16a34a";
-                
-                document.getElementById("audit_scholars_count").innerText = students.length;
-                
-                const distinctPrograms = new Set(students.map(s => s.course.toUpperCase().trim())).size;
-                document.getElementById("audit_programs_count").innerText = distinctPrograms;
-            }
-        } catch(err) {
-            badge.innerText = "DISCONNECTED / TIMEOUT";
-            badge.style.color = "#dc2626";
+
+            await apiFetch(
+                "/health"
+            );
+
+            const students =
+                await apiFetch(
+                    "/students/search?filter="
+                );
+
+            badge.textContent =
+                "ONLINE - DATABASE CONNECTED";
+
+            badge.style.color =
+                "#16a34a";
+
+            connectionBadge.textContent =
+                "API ONLINE";
+
+            connectionBadge.style.color =
+                "#bbf7d0";
+
+            document.getElementById(
+                "audit_scholars_count"
+            ).textContent =
+                students.length;
+
+            const programs =
+                new Set(
+                    students
+                        .map(
+                            student =>
+                                String(
+                                    student.course ||
+                                    ""
+                                )
+                                .trim()
+                                .toUpperCase()
+                        )
+                        .filter(Boolean)
+                );
+
+            document.getElementById(
+                "audit_programs_count"
+            ).textContent =
+                programs.size;
+
+        } catch (error) {
+
+            badge.textContent =
+                "OFFLINE / API UNAVAILABLE";
+
+            badge.style.color =
+                "#dc2626";
+
+            connectionBadge.textContent =
+                "API OFFLINE";
+
+            connectionBadge.style.color =
+                "#fecaca";
+
+            document.getElementById(
+                "audit_scholars_count"
+            ).textContent =
+                "0";
+
+            document.getElementById(
+                "audit_programs_count"
+            ).textContent =
+                "0";
         }
     }
 
-    // SANITIZER METHOD: Prevents raw string splits from throwing database errors
-    function sanitize(val) {
-        if(!val) return "";
-        return val.replace(/,/g, " ").replace(/"/g, "'").trim();
+
+    // ============================================================
+    // HELPERS
+    // ============================================================
+
+    function valueOf(id) {
+
+        const element =
+            document.getElementById(id);
+
+        if (!element) {
+            return "";
+        }
+
+        return element.value.trim();
     }
+
+
+    function moneyNumber(value) {
+
+        const number =
+            Number(value);
+
+        if (!Number.isFinite(number)) {
+            return "0.00";
+        }
+
+        return number.toFixed(2);
+    }
+
+
+    function showStatus(
+        id,
+        message,
+        success
+    ) {
+
+        const element =
+            document.getElementById(id);
+
+        element.textContent =
+            message;
+
+        element.className =
+            "status " +
+            (
+                success
+                    ? "success"
+                    : "error"
+            );
+    }
+
 </script>
+
 </body>
 </html>
