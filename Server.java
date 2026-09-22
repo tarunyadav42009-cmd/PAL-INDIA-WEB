@@ -7,6 +7,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -20,10 +22,15 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.sql.Types;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Executors;
+
 
 public class Server {
 
@@ -52,20 +59,6 @@ public class Server {
     private static final int SERVER_PORT =
             parsePort(env("SERVER_PORT", "8080"));
 
-    /*
-     * IMPORTANT:
-     *
-     * Your project currently contains index.html in the root:
-     *
-     *     Server.java
-     *     index.html
-     *
-     * Therefore "." is used as the default public directory.
-     *
-     * If you create a public folder later, you can set:
-     *
-     * PUBLIC_DIR=public
-     */
     private static final Path PUBLIC_DIR =
             Paths.get(env("PUBLIC_DIR", "."))
                     .toAbsolutePath()
@@ -83,6 +76,19 @@ public class Server {
             "&characterEncoding=UTF-8" +
             "&allowPublicKeyRetrieval=true";
 
+    private static final ZoneId INDIA_ZONE =
+            ZoneId.of("Asia/Kolkata");
+
+    private static final DateTimeFormatter RECEIPT_DATE_FORMAT =
+            DateTimeFormatter.ofPattern(
+                    "yyyyMMddHHmmss"
+            );
+
+    private static final DateTimeFormatter PAYMENT_DATE_FORMAT =
+            DateTimeFormatter.ofPattern(
+                    "dd-MM-yyyy HH:mm:ss"
+            );
+
     // ============================================================
     // MAIN
     // ============================================================
@@ -93,25 +99,34 @@ public class Server {
         System.out.println("========================================");
         System.out.println("          PAL INDIA SERVER");
         System.out.println("========================================");
-        System.out.println("Database : " +
-                DB_HOST + ":" + DB_PORT + "/" + DB_NAME);
-        System.out.println("DB User  : " + DB_USER);
-        System.out.println("Web      : " +
-                SERVER_HOST + ":" + SERVER_PORT);
-        System.out.println("Public   : " + PUBLIC_DIR);
+
+        System.out.println(
+                "Database : " +
+                DB_HOST +
+                ":" +
+                DB_PORT +
+                "/" +
+                DB_NAME
+        );
+
+        System.out.println(
+                "DB User  : " +
+                DB_USER
+        );
+
+        System.out.println(
+                "Web      : " +
+                SERVER_HOST +
+                ":" +
+                SERVER_PORT
+        );
+
+        System.out.println(
+                "Public   : " +
+                PUBLIC_DIR
+        );
+
         System.out.println("========================================");
-
-        /*
-         * MySQL Connector/J 9.x supports JDBC 4 automatic driver
-         * loading, so Class.forName(...) is intentionally not used.
-         *
-         * The connector JAR must still be present on the runtime
-         * classpath.
-         */
-
-        // --------------------------------------------------------
-        // Test database connection before starting HTTP server
-        // --------------------------------------------------------
 
         try (Connection ignored = getConnection()) {
 
@@ -125,38 +140,23 @@ public class Server {
             System.err.println(
                     "DATABASE CONNECTION FAILED"
             );
-            System.err.println(
-                    "----------------------------------------"
-            );
+
             System.err.println(
                     "Host     : " + DB_HOST
             );
+
             System.err.println(
                     "Port     : " + DB_PORT
             );
+
             System.err.println(
                     "Database : " + DB_NAME
             );
+
             System.err.println(
                     "User     : " + DB_USER
             );
-            System.err.println();
-            System.err.println(
-                    "Check that:"
-            );
-            System.err.println(
-                    "1. MySQL is running."
-            );
-            System.err.println(
-                    "2. The database exists."
-            );
-            System.err.println(
-                    "3. The username/password are correct."
-            );
-            System.err.println(
-                    "4. mysql-connector-j-9.7.0.jar is on the classpath."
-            );
-            System.err.println();
+
             System.err.println(
                     "Original error: " + e.getMessage()
             );
@@ -164,9 +164,23 @@ public class Server {
             return;
         }
 
-        // --------------------------------------------------------
-        // Create HTTP server
-        // --------------------------------------------------------
+        try {
+
+            initializeDatabase();
+
+        } catch (SQLException e) {
+
+            System.err.println();
+            System.err.println(
+                    "DATABASE INITIALIZATION FAILED"
+            );
+
+            System.err.println(
+                    e.getMessage()
+            );
+
+            return;
+        }
 
         HttpServer server =
                 HttpServer.create(
@@ -176,10 +190,6 @@ public class Server {
                         ),
                         0
                 );
-
-        // --------------------------------------------------------
-        // API endpoints
-        // --------------------------------------------------------
 
         server.createContext(
                 "/api/health",
@@ -201,18 +211,15 @@ public class Server {
                 new PaymentsHandler()
         );
 
-        // --------------------------------------------------------
-        // Frontend
-        // --------------------------------------------------------
+        server.createContext(
+                "/api/receipts",
+                new ReceiptHandler()
+        );
 
         server.createContext(
                 "/",
                 new StaticFileHandler()
         );
-
-        // --------------------------------------------------------
-        // Thread pool
-        // --------------------------------------------------------
 
         int threads =
                 Math.max(
@@ -222,7 +229,9 @@ public class Server {
                 );
 
         server.setExecutor(
-                Executors.newFixedThreadPool(threads)
+                Executors.newFixedThreadPool(
+                        threads
+                )
         );
 
         server.start();
@@ -231,13 +240,50 @@ public class Server {
         System.out.println(
                 "Server started successfully."
         );
+
         System.out.println(
                 "Open: http://" +
                 SERVER_HOST +
                 ":" +
                 SERVER_PORT
         );
+
         System.out.println();
+    }
+
+    // ============================================================
+    // DATABASE INITIALIZATION
+    // ============================================================
+
+    private static void initializeDatabase()
+            throws SQLException {
+
+        String sql =
+                "CREATE TABLE IF NOT EXISTS fee_adjustments (" +
+                "adjustment_id BIGINT NOT NULL AUTO_INCREMENT," +
+                "student_id INT NOT NULL," +
+                "old_bill DECIMAL(12,2) NOT NULL," +
+                "new_bill DECIMAL(12,2) NOT NULL," +
+                "adjustment_amount DECIMAL(12,2) NOT NULL," +
+                "reason VARCHAR(500) NOT NULL," +
+                "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP," +
+                "PRIMARY KEY (adjustment_id)," +
+                "INDEX idx_fee_adjustments_student (student_id)," +
+                "CONSTRAINT fk_fee_adjustments_student " +
+                "FOREIGN KEY (student_id) " +
+                "REFERENCES student_records(id) " +
+                "ON DELETE CASCADE" +
+                ")";
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement()) {
+
+            stmt.executeUpdate(sql);
+        }
+
+        System.out.println(
+                "Database initialization: OK"
+        );
     }
 
     // ============================================================
@@ -260,7 +306,8 @@ public class Server {
         return value.trim();
     }
 
-    private static int parsePort(String value) {
+    private static int parsePort(
+            String value) {
 
         try {
 
@@ -301,7 +348,7 @@ public class Server {
     }
 
     // ============================================================
-    // HTTP SECURITY HEADERS
+    // HTTP SECURITY
     // ============================================================
 
     public static void securityHeaders(
@@ -381,7 +428,7 @@ public class Server {
     }
 
     // ============================================================
-    // READ REQUEST BODY
+    // REQUEST BODY
     // ============================================================
 
     public static String readBody(
@@ -415,7 +462,7 @@ public class Server {
     }
 
     // ============================================================
-    // JSON RESPONSE
+    // JSON
     // ============================================================
 
     public static void sendJson(
@@ -456,10 +503,6 @@ public class Server {
         }
     }
 
-    // ============================================================
-    // ERROR RESPONSE
-    // ============================================================
-
     public static void sendError(
             HttpExchange exchange,
             int status,
@@ -476,7 +519,7 @@ public class Server {
     }
 
     // ============================================================
-    // HEALTH CHECK
+    // HEALTH
     // ============================================================
 
     static class HealthHandler
@@ -620,7 +663,7 @@ public class Server {
                             "course"
                     );
 
-            double bill =
+            BigDecimal bill =
                     parseMoney(
                             body.getOrDefault(
                                     "bill",
@@ -628,18 +671,11 @@ public class Server {
                             )
                     );
 
-            if (bill < 0) {
-
-                throw new IllegalArgumentException(
-                        "Bill cannot be negative"
-                );
-            }
-
             String date =
                     body.getOrDefault(
                             "date_of_admission",
                             ""
-                    );
+                    ).trim();
 
             String sql =
                     "INSERT INTO student_records " +
@@ -675,21 +711,21 @@ public class Server {
                         course
                 );
 
-                stmt.setDouble(
+                stmt.setBigDecimal(
                         5,
                         bill
                 );
 
-                stmt.setDouble(
+                stmt.setBigDecimal(
                         6,
                         bill
                 );
 
-                if (date.trim().isEmpty()) {
+                if (date.isEmpty()) {
 
                     stmt.setNull(
                             7,
-                            java.sql.Types.VARCHAR
+                            Types.VARCHAR
                     );
 
                 } else {
@@ -770,7 +806,7 @@ public class Server {
                             "course"
                     );
 
-            double newBill =
+            BigDecimal newBill =
                     parseMoney(
                             required(
                                     body,
@@ -784,12 +820,11 @@ public class Server {
                             ""
                     );
 
-            if (newBill < 0) {
-
-                throw new IllegalArgumentException(
-                        "Bill cannot be negative"
-                );
-            }
+            String adjustmentReason =
+                    body.getOrDefault(
+                            "adjustment_reason",
+                            ""
+                    ).trim();
 
             try (Connection conn =
                          getConnection()) {
@@ -798,8 +833,8 @@ public class Server {
 
                 try {
 
-                    double oldBill;
-                    double pendingBalance;
+                    BigDecimal oldBill;
+                    BigDecimal pendingBalance;
 
                     String select =
                             "SELECT bill,pending_balance " +
@@ -831,54 +866,59 @@ public class Server {
                             }
 
                             oldBill =
-                                    rs.getDouble(
-                                            "bill"
+                                    moneyValue(
+                                            rs.getBigDecimal(
+                                                    "bill"
+                                            )
                                     );
 
                             pendingBalance =
-                                    rs.getDouble(
-                                            "pending_balance"
+                                    moneyValue(
+                                            rs.getBigDecimal(
+                                                    "pending_balance"
+                                            )
                                     );
                         }
                     }
 
-                    double difference =
-                            newBill - oldBill;
+                    BigDecimal totalPaid =
+                            oldBill.subtract(
+                                    pendingBalance
+                            );
 
-                    double newPending =
-                            pendingBalance +
-                                    difference;
+                    if (totalPaid.compareTo(
+                            BigDecimal.ZERO
+                    ) < 0) {
 
-                    /*
-                     * Example:
-                     *
-                     * Old bill = 10,000
-                     * Paid     = 3,000
-                     * Pending  = 7,000
-                     *
-                     * New bill = 8,000
-                     * New pending = 5,000
-                     *
-                     * This is allowed.
-                     *
-                     * New bill = 2,000
-                     * New pending = -1,000
-                     *
-                     * This is rejected.
-                     */
+                        throw new SQLException(
+                                "Existing student balance is inconsistent"
+                        );
+                    }
 
-                    if (newPending < 0) {
+                    BigDecimal newPending =
+                            newBill.subtract(
+                                    totalPaid
+                            );
+
+                    if (newPending.compareTo(
+                            BigDecimal.ZERO
+                    ) < 0) {
 
                         conn.rollback();
 
                         sendError(
                                 exchange,
                                 400,
-                                "Bill cannot be lower than the amount already paid"
+                                "Course fee cannot be lower than the amount already paid"
                         );
 
                         return;
                     }
+
+                    BigDecimal adjustment =
+                            newBill.subtract(
+                                    oldBill
+                            );
 
                     String update =
                             "UPDATE student_records SET " +
@@ -914,12 +954,12 @@ public class Server {
                                 course
                         );
 
-                        stmt.setDouble(
+                        stmt.setBigDecimal(
                                 5,
                                 newBill
                         );
 
-                        stmt.setDouble(
+                        stmt.setBigDecimal(
                                 6,
                                 newPending
                         );
@@ -937,12 +977,124 @@ public class Server {
                         stmt.executeUpdate();
                     }
 
+                    if (adjustment.compareTo(
+                            BigDecimal.ZERO
+                    ) != 0) {
+
+                        String reason =
+                                adjustmentReason.isEmpty()
+                                        ? (
+                                            adjustment.compareTo(
+                                                    BigDecimal.ZERO
+                                            ) > 0
+                                                    ? "Course fee increased"
+                                                    : "Course fee reduced"
+                                        )
+                                        : adjustmentReason;
+
+                        String insert =
+                                "INSERT INTO fee_adjustments " +
+                                "(student_id,old_bill,new_bill," +
+                                "adjustment_amount,reason) " +
+                                "VALUES (?,?,?,?,?)";
+
+                        try (PreparedStatement stmt =
+                                     conn.prepareStatement(insert)) {
+
+                            stmt.setInt(
+                                    1,
+                                    id
+                            );
+
+                            stmt.setBigDecimal(
+                                    2,
+                                    oldBill
+                            );
+
+                            stmt.setBigDecimal(
+                                    3,
+                                    newBill
+                            );
+
+                            stmt.setBigDecimal(
+                                    4,
+                                    adjustment
+                            );
+
+                            stmt.setString(
+                                    5,
+                                    reason
+                            );
+
+                            stmt.executeUpdate();
+                        }
+                    }
+
                     conn.commit();
+
+                    StringBuilder response =
+                            new StringBuilder();
+
+                    response.append("{");
+
+                    response.append(
+                            "\"success\":true,"
+                    );
+
+                    response.append(
+                            "\"old_bill\":"
+                    );
+
+                    response.append(
+                            money(oldBill)
+                    );
+
+                    response.append(",");
+
+                    response.append(
+                            "\"new_bill\":"
+                    );
+
+                    response.append(
+                            money(newBill)
+                    );
+
+                    response.append(",");
+
+                    response.append(
+                            "\"adjustment\":"
+                    );
+
+                    response.append(
+                            money(adjustment)
+                    );
+
+                    response.append(",");
+
+                    response.append(
+                            "\"total_paid\":"
+                    );
+
+                    response.append(
+                            money(totalPaid)
+                    );
+
+                    response.append(",");
+
+                    response.append(
+                            "\"pending_balance\":"
+                    );
+
+                    response.append(
+                            money(newPending)
+                    );
+
+                    response.append("}");
 
                     sendJson(
                             exchange,
                             200,
-                            "{\"success\":true}"
+                            response.toString()
                     );
 
                 } catch (Exception e) {
@@ -1020,6 +1172,7 @@ public class Server {
                         "OR mobile_no LIKE ? " +
                         "OR course LIKE ? " +
                         "OR address LIKE ? " +
+                        "OR CAST(id AS CHAR) LIKE ? " +
                         "ORDER BY id DESC";
 
                 StringBuilder result =
@@ -1034,25 +1187,11 @@ public class Server {
                      PreparedStatement stmt =
                              conn.prepareStatement(sql)) {
 
-                    stmt.setString(
-                            1,
-                            pattern
-                    );
-
-                    stmt.setString(
-                            2,
-                            pattern
-                    );
-
-                    stmt.setString(
-                            3,
-                            pattern
-                    );
-
-                    stmt.setString(
-                            4,
-                            pattern
-                    );
+                    stmt.setString(1, pattern);
+                    stmt.setString(2, pattern);
+                    stmt.setString(3, pattern);
+                    stmt.setString(4, pattern);
+                    stmt.setString(5, pattern);
 
                     try (ResultSet rs =
                                  stmt.executeQuery()) {
@@ -1066,9 +1205,7 @@ public class Server {
                             first = false;
 
                             int id =
-                                    rs.getInt(
-                                            "id"
-                                    );
+                                    rs.getInt("id");
 
                             result.append("{");
 
@@ -1076,10 +1213,7 @@ public class Server {
                                     "\"id\":"
                             );
 
-                            result.append(
-                                    id
-                            );
-
+                            result.append(id);
                             result.append(",");
 
                             result.append(
@@ -1088,9 +1222,7 @@ public class Server {
 
                             result.append(
                                     Json.quote(
-                                            rs.getString(
-                                                    "name"
-                                            )
+                                            rs.getString("name")
                                     )
                             );
 
@@ -1144,9 +1276,7 @@ public class Server {
 
                             result.append(
                                     money(
-                                            rs.getDouble(
-                                                    "bill"
-                                            )
+                                            rs.getBigDecimal("bill")
                                     )
                             );
 
@@ -1158,7 +1288,7 @@ public class Server {
 
                             result.append(
                                     money(
-                                            rs.getDouble(
+                                            rs.getBigDecimal(
                                                     "pending_balance"
                                             )
                                     )
@@ -1204,6 +1334,18 @@ public class Server {
                                     result
                             );
 
+                            result.append(",");
+
+                            result.append(
+                                    "\"adjustments\":"
+                            );
+
+                            appendAdjustmentHistory(
+                                    conn,
+                                    id,
+                                    result
+                            );
+
                             result.append("}");
                         }
                     }
@@ -1243,6 +1385,7 @@ public class Server {
 
             String sql =
                     "SELECT " +
+                    "transaction_id," +
                     "amount_paid," +
                     "payment_date," +
                     "remarks " +
@@ -1276,19 +1419,30 @@ public class Server {
                                         "payment_date"
                                 );
 
-                        String date =
-                                timestamp == null
-                                        ? ""
-                                        : timestamp.toString();
-
                         result.append("{");
+
+                        result.append(
+                                "\"transaction_id\":"
+                        );
+
+                        result.append(
+                                rs.getLong(
+                                        "transaction_id"
+                                )
+                        );
+
+                        result.append(",");
 
                         result.append(
                                 "\"date\":"
                         );
 
                         result.append(
-                                Json.quote(date)
+                                Json.quote(
+                                        timestamp == null
+                                                ? ""
+                                                : timestamp.toString()
+                                )
                         );
 
                         result.append(",");
@@ -1313,9 +1467,149 @@ public class Server {
 
                         result.append(
                                 money(
-                                        rs.getDouble(
+                                        rs.getBigDecimal(
                                                 "amount_paid"
                                         )
+                                )
+                        );
+
+                        result.append("}");
+                    }
+                }
+            }
+
+            result.append("]");
+        }
+
+        // ========================================================
+        // FEE ADJUSTMENT HISTORY
+        // ========================================================
+
+        private void appendAdjustmentHistory(
+                Connection conn,
+                int studentId,
+                StringBuilder result)
+                throws SQLException {
+
+            result.append("[");
+
+            String sql =
+                    "SELECT " +
+                    "adjustment_id," +
+                    "old_bill," +
+                    "new_bill," +
+                    "adjustment_amount," +
+                    "reason," +
+                    "created_at " +
+                    "FROM fee_adjustments " +
+                    "WHERE student_id=? " +
+                    "ORDER BY adjustment_id ASC";
+
+            boolean first = true;
+
+            try (PreparedStatement stmt =
+                         conn.prepareStatement(sql)) {
+
+                stmt.setInt(
+                        1,
+                        studentId
+                );
+
+                try (ResultSet rs =
+                             stmt.executeQuery()) {
+
+                    while (rs.next()) {
+
+                        if (!first) {
+                            result.append(",");
+                        }
+
+                        first = false;
+
+                        Timestamp timestamp =
+                                rs.getTimestamp(
+                                        "created_at"
+                                );
+
+                        result.append("{");
+
+                        result.append(
+                                "\"adjustment_id\":"
+                        );
+
+                        result.append(
+                                rs.getLong(
+                                        "adjustment_id"
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"old_bill\":"
+                        );
+
+                        result.append(
+                                money(
+                                        rs.getBigDecimal(
+                                                "old_bill"
+                                        )
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"new_bill\":"
+                        );
+
+                        result.append(
+                                money(
+                                        rs.getBigDecimal(
+                                                "new_bill"
+                                        )
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"adjustment_amount\":"
+                        );
+
+                        result.append(
+                                money(
+                                        rs.getBigDecimal(
+                                                "adjustment_amount"
+                                        )
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"reason\":"
+                        );
+
+                        result.append(
+                                Json.quote(
+                                        rs.getString(
+                                                "reason"
+                                        )
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"date\":"
+                        );
+
+                        result.append(
+                                Json.quote(
+                                        timestamp == null
+                                                ? ""
+                                                : timestamp.toString()
                                 )
                         );
 
@@ -1371,7 +1665,7 @@ public class Server {
                                 )
                         );
 
-                double payment =
+                BigDecimal payment =
                         parseMoney(
                                 required(
                                         body,
@@ -1383,17 +1677,15 @@ public class Server {
                         body.getOrDefault(
                                 "remarks",
                                 "Installment Entry"
-                        );
+                        ).trim();
 
-                if (payment <= 0) {
+                if (payment.compareTo(
+                        BigDecimal.ZERO
+                ) <= 0) {
 
-                    sendError(
-                            exchange,
-                            400,
+                    throw new IllegalArgumentException(
                             "Payment amount must be greater than zero"
                     );
-
-                    return;
                 }
 
                 try (Connection conn =
@@ -1403,10 +1695,22 @@ public class Server {
 
                     try {
 
-                        double pending;
+                        String name;
+                        String mobile;
+                        String address;
+                        String course;
+
+                        BigDecimal courseFee;
+                        BigDecimal previousPending;
 
                         String select =
-                                "SELECT pending_balance " +
+                                "SELECT " +
+                                "name," +
+                                "mobile_no," +
+                                "address," +
+                                "course," +
+                                "bill," +
+                                "pending_balance " +
                                 "FROM student_records " +
                                 "WHERE id=? FOR UPDATE";
 
@@ -1434,14 +1738,50 @@ public class Server {
                                     return;
                                 }
 
-                                pending =
-                                        rs.getDouble(
-                                                "pending_balance"
+                                name =
+                                        rs.getString("name");
+
+                                mobile =
+                                        rs.getString(
+                                                "mobile_no"
+                                        );
+
+                                address =
+                                        rs.getString(
+                                                "address"
+                                        );
+
+                                course =
+                                        rs.getString("course");
+
+                                courseFee =
+                                        moneyValue(
+                                                rs.getBigDecimal(
+                                                        "bill"
+                                                )
+                                        );
+
+                                previousPending =
+                                        moneyValue(
+                                                rs.getBigDecimal(
+                                                        "pending_balance"
+                                                )
                                         );
                             }
                         }
 
-                        if (payment > pending) {
+                        if (previousPending.compareTo(
+                                BigDecimal.ZERO
+                        ) < 0) {
+
+                            throw new SQLException(
+                                    "Student balance is invalid"
+                            );
+                        }
+
+                        if (payment.compareTo(
+                                previousPending
+                        ) > 0) {
 
                             conn.rollback();
 
@@ -1454,22 +1794,59 @@ public class Server {
                             return;
                         }
 
+                        BigDecimal previousPaid =
+                                courseFee.subtract(
+                                        previousPending
+                                );
+
+                        if (previousPaid.compareTo(
+                                BigDecimal.ZERO
+                        ) < 0) {
+
+                            throw new SQLException(
+                                    "Student payment history is inconsistent"
+                            );
+                        }
+
+                        BigDecimal totalPaid =
+                                previousPaid.add(
+                                        payment
+                                );
+
+                        BigDecimal newPending =
+                                courseFee.subtract(
+                                        totalPaid
+                                );
+
+                        newPending =
+                                normalizeMoney(
+                                        newPending
+                                );
+
+                        if (newPending.compareTo(
+                                BigDecimal.ZERO
+                        ) < 0) {
+
+                            throw new SQLException(
+                                    "Calculated balance cannot be negative"
+                            );
+                        }
+
                         // ------------------------------------------------
-                        // Update pending balance
+                        // Update balance
                         // ------------------------------------------------
 
                         String update =
                                 "UPDATE student_records " +
-                                "SET pending_balance = " +
-                                "pending_balance - ? " +
+                                "SET pending_balance=? " +
                                 "WHERE id=?";
 
                         try (PreparedStatement stmt =
                                      conn.prepareStatement(update)) {
 
-                            stmt.setDouble(
+                            stmt.setBigDecimal(
                                     1,
-                                    payment
+                                    newPending
                             );
 
                             stmt.setInt(
@@ -1489,8 +1866,10 @@ public class Server {
                         }
 
                         // ------------------------------------------------
-                        // Save transaction
+                        // Save payment
                         // ------------------------------------------------
+
+                        long transactionId = -1;
 
                         String insert =
                                 "INSERT INTO fee_transactions " +
@@ -1498,32 +1877,269 @@ public class Server {
                                 "VALUES (?,?,?)";
 
                         try (PreparedStatement stmt =
-                                     conn.prepareStatement(insert)) {
+                                     conn.prepareStatement(
+                                             insert,
+                                             Statement.RETURN_GENERATED_KEYS
+                                     )) {
 
                             stmt.setInt(
                                     1,
                                     studentId
                             );
 
-                            stmt.setDouble(
+                            stmt.setBigDecimal(
                                     2,
                                     payment
                             );
 
                             stmt.setString(
                                     3,
-                                    remarks
+                                    remarks.isEmpty()
+                                            ? "Installment Entry"
+                                            : remarks
                             );
 
                             stmt.executeUpdate();
+
+                            try (ResultSet keys =
+                                         stmt.getGeneratedKeys()) {
+
+                                if (keys.next()) {
+
+                                    transactionId =
+                                            keys.getLong(1);
+                                }
+                            }
                         }
 
+                        if (transactionId <= 0) {
+
+                            throw new SQLException(
+                                    "Unable to create payment receipt number"
+                            );
+                        }
+
+                        /*
+                         * Generate the receipt timestamp using
+                         * India Standard Time.
+                         */
+                        ZonedDateTime indiaNow =
+                                ZonedDateTime.now(
+                                        INDIA_ZONE
+                                );
+
+                        String receiptNumber =
+                                "PAY-" +
+                                indiaNow.format(
+                                        RECEIPT_DATE_FORMAT
+                                ) +
+                                "-" +
+                                transactionId;
+
+                        String paymentDate =
+                                indiaNow.format(
+                                        PAYMENT_DATE_FORMAT
+                                );
+
                         conn.commit();
+
+                        // ------------------------------------------------
+                        // Build response
+                        // ------------------------------------------------
+
+                        StringBuilder response =
+                                new StringBuilder();
+
+                        response.append("{");
+
+                        response.append(
+                                "\"success\":true,"
+                        );
+
+                        response.append(
+                                "\"receipt_no\":"
+                        );
+
+                        response.append(
+                                Json.quote(
+                                        receiptNumber
+                                )
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"transaction_id\":"
+                        );
+
+                        response.append(
+                                transactionId
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"payment_date\":"
+                        );
+
+                        response.append(
+                                Json.quote(
+                                        paymentDate
+                                )
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"student\":{"
+                        );
+
+                        response.append(
+                                "\"id\":"
+                        );
+
+                        response.append(
+                                studentId
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"name\":"
+                        );
+
+                        response.append(
+                                Json.quote(name)
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"mobile_no\":"
+                        );
+
+                        response.append(
+                                Json.quote(mobile)
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"address\":"
+                        );
+
+                        response.append(
+                                Json.quote(address)
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"course\":"
+                        );
+
+                        response.append(
+                                Json.quote(course)
+                        );
+
+                        response.append("}");
+
+                        response.append(",");
+
+                        response.append(
+                                "\"course_fee\":"
+                        );
+
+                        response.append(
+                                money(courseFee)
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"previous_paid\":"
+                        );
+
+                        response.append(
+                                money(previousPaid)
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"payment_amount\":"
+                        );
+
+                        response.append(
+                                money(payment)
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"total_paid\":"
+                        );
+
+                        response.append(
+                                money(totalPaid)
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"previous_pending\":"
+                        );
+
+                        response.append(
+                                money(previousPending)
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"pending_balance\":"
+                        );
+
+                        response.append(
+                                money(newPending)
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"remarks\":"
+                        );
+
+                        response.append(
+                                Json.quote(
+                                        remarks.isEmpty()
+                                                ? "Installment Entry"
+                                                : remarks
+                                )
+                        );
+
+                        response.append(",");
+
+                        response.append(
+                                "\"adjustments\":"
+                        );
+
+                        /*
+                         * This connection is still available after
+                         * commit, so adjustment history can be read.
+                         */
+                        appendAdjustmentHistory(
+                                conn,
+                                studentId,
+                                response
+                        );
+
+                        response.append("}");
 
                         sendJson(
                                 exchange,
                                 200,
-                                "{\"success\":true}"
+                                response.toString()
                         );
 
                     } catch (Exception e) {
@@ -1536,14 +2152,6 @@ public class Server {
                         throw e;
                     }
                 }
-
-            } catch (NumberFormatException e) {
-
-                sendError(
-                        exchange,
-                        400,
-                        "Invalid student ID or payment amount"
-                );
 
             } catch (IllegalArgumentException e) {
 
@@ -1563,6 +2171,811 @@ public class Server {
                         "Unable to process payment"
                 );
             }
+        }
+
+        private void appendAdjustmentHistory(
+                Connection conn,
+                int studentId,
+                StringBuilder result)
+                throws SQLException {
+
+            result.append("[");
+
+            String sql =
+                    "SELECT " +
+                    "adjustment_id," +
+                    "old_bill," +
+                    "new_bill," +
+                    "adjustment_amount," +
+                    "reason," +
+                    "created_at " +
+                    "FROM fee_adjustments " +
+                    "WHERE student_id=? " +
+                    "ORDER BY adjustment_id ASC";
+
+            boolean first = true;
+
+            try (PreparedStatement stmt =
+                         conn.prepareStatement(sql)) {
+
+                stmt.setInt(
+                        1,
+                        studentId
+                );
+
+                try (ResultSet rs =
+                             stmt.executeQuery()) {
+
+                    while (rs.next()) {
+
+                        if (!first) {
+                            result.append(",");
+                        }
+
+                        first = false;
+
+                        Timestamp timestamp =
+                                rs.getTimestamp(
+                                        "created_at"
+                                );
+
+                        result.append("{");
+
+                        result.append(
+                                "\"adjustment_id\":"
+                        );
+
+                        result.append(
+                                rs.getLong(
+                                        "adjustment_id"
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"old_bill\":"
+                        );
+
+                        result.append(
+                                money(
+                                        rs.getBigDecimal(
+                                                "old_bill"
+                                        )
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"new_bill\":"
+                        );
+
+                        result.append(
+                                money(
+                                        rs.getBigDecimal(
+                                                "new_bill"
+                                        )
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"adjustment_amount\":"
+                        );
+
+                        result.append(
+                                money(
+                                        rs.getBigDecimal(
+                                                "adjustment_amount"
+                                        )
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"reason\":"
+                        );
+
+                        result.append(
+                                Json.quote(
+                                        rs.getString(
+                                                "reason"
+                                        )
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"date\":"
+                        );
+
+                        result.append(
+                                Json.quote(
+                                        timestamp == null
+                                                ? ""
+                                                : timestamp.toString()
+                                )
+                        );
+
+                        result.append("}");
+                    }
+                }
+            }
+
+            result.append("]");
+        }
+    }
+
+    // ============================================================
+    // RECEIPT API
+    // ============================================================
+
+    static class ReceiptHandler
+            implements HttpHandler {
+
+        @Override
+        public void handle(
+                HttpExchange exchange)
+                throws IOException {
+
+            if (handleOptions(exchange)) {
+                return;
+            }
+
+            if (!"GET".equalsIgnoreCase(
+                    exchange.getRequestMethod())) {
+
+                sendError(
+                        exchange,
+                        405,
+                        "Method not allowed"
+                );
+
+                return;
+            }
+
+            try {
+
+                Map<String, String> params =
+                        parseQuery(
+                                exchange
+                                        .getRequestURI()
+                                        .getRawQuery()
+                        );
+
+                int transactionId =
+                        parseId(
+                                required(
+                                        params,
+                                        "transaction_id"
+                                )
+                        );
+
+                String json =
+                        buildReceiptJson(
+                                transactionId
+                        );
+
+                if (json == null) {
+
+                    sendError(
+                            exchange,
+                            404,
+                            "Receipt not found"
+                    );
+
+                    return;
+                }
+
+                sendJson(
+                        exchange,
+                        200,
+                        json
+                );
+
+            } catch (IllegalArgumentException e) {
+
+                sendError(
+                        exchange,
+                        400,
+                        e.getMessage()
+                );
+
+            } catch (Exception e) {
+
+                e.printStackTrace();
+
+                sendError(
+                        exchange,
+                        500,
+                        "Unable to load receipt"
+                );
+            }
+        }
+
+        private String buildReceiptJson(
+                int transactionId)
+                throws SQLException {
+
+            String sql =
+                    "SELECT " +
+                    "t.transaction_id," +
+                    "t.student_id," +
+                    "t.amount_paid," +
+                    "t.payment_date," +
+                    "t.remarks," +
+                    "s.name," +
+                    "s.mobile_no," +
+                    "s.address," +
+                    "s.course," +
+                    "s.bill," +
+                    "s.pending_balance " +
+                    "FROM fee_transactions t " +
+                    "INNER JOIN student_records s " +
+                    "ON s.id=t.student_id " +
+                    "WHERE t.transaction_id=?";
+
+            try (Connection conn =
+                         getConnection();
+                 PreparedStatement stmt =
+                         conn.prepareStatement(sql)) {
+
+                stmt.setInt(
+                        1,
+                        transactionId
+                );
+
+                try (ResultSet rs =
+                             stmt.executeQuery()) {
+
+                    if (!rs.next()) {
+                        return null;
+                    }
+
+                    BigDecimal courseFee =
+                            moneyValue(
+                                    rs.getBigDecimal("bill")
+                            );
+
+                    BigDecimal pending =
+                            moneyValue(
+                                    rs.getBigDecimal(
+                                            "pending_balance"
+                                    )
+                            );
+
+                    BigDecimal payment =
+                            moneyValue(
+                                    rs.getBigDecimal(
+                                            "amount_paid"
+                                    )
+                            );
+
+                    BigDecimal totalPaid =
+                            courseFee.subtract(
+                                    pending
+                            );
+
+                    BigDecimal previousPending =
+                            pending.add(payment);
+
+                    BigDecimal previousPaid =
+                            courseFee.subtract(
+                                    previousPending
+                            );
+
+                    /*
+                     * Build the receipt number using the exact
+                     * same YYYYMMDDHHMMSS format used when the
+                     * payment was created.
+                     *
+                     * The database connection uses UTC, so the
+                     * stored timestamp is converted to India time
+                     * before formatting.
+                     */
+                    Timestamp paymentTimestamp =
+                            rs.getTimestamp(
+                                    "payment_date"
+                            );
+
+                    ZonedDateTime receiptTime;
+
+                    if (paymentTimestamp == null) {
+
+                        receiptTime =
+                                ZonedDateTime.now(
+                                        INDIA_ZONE
+                                );
+
+                    } else {
+
+                        receiptTime =
+                                paymentTimestamp
+                                        .toInstant()
+                                        .atZone(
+                                                INDIA_ZONE
+                                        );
+                    }
+
+                    String receiptNumber =
+                            "PAY-" +
+                            receiptTime.format(
+                                    RECEIPT_DATE_FORMAT
+                            ) +
+                            "-" +
+                            transactionId;
+
+                    String paymentDate =
+                            receiptTime.format(
+                                    PAYMENT_DATE_FORMAT
+                            );
+
+                    StringBuilder result =
+                            new StringBuilder();
+
+                    result.append("{");
+
+                    result.append(
+                            "\"success\":true,"
+                    );
+
+                    result.append(
+                            "\"receipt_no\":"
+                    );
+
+                    result.append(
+                            Json.quote(
+                                    receiptNumber
+                            )
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"transaction_id\":"
+                    );
+
+                    result.append(
+                            transactionId
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"payment_date\":"
+                    );
+
+                    result.append(
+                            Json.quote(
+                                    paymentDate
+                            )
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"student\":{"
+                    );
+
+                    result.append(
+                            "\"id\":"
+                    );
+
+                    result.append(
+                            rs.getInt("student_id")
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"name\":"
+                    );
+
+                    result.append(
+                            Json.quote(
+                                    rs.getString("name")
+                            )
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"mobile_no\":"
+                    );
+
+                    result.append(
+                            Json.quote(
+                                    rs.getString(
+                                            "mobile_no"
+                                    )
+                            )
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"address\":"
+                    );
+
+                    result.append(
+                            Json.quote(
+                                    rs.getString("address")
+                            )
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"course\":"
+                    );
+
+                    result.append(
+                            Json.quote(
+                                    rs.getString("course")
+                            )
+                    );
+
+                    result.append("}");
+
+                    result.append(",");
+
+                    result.append(
+                            "\"course_fee\":"
+                    );
+
+                    result.append(
+                            money(courseFee)
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"previous_paid\":"
+                    );
+
+                    result.append(
+                            money(previousPaid)
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"payment_amount\":"
+                    );
+
+                    result.append(
+                            money(payment)
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"total_paid\":"
+                    );
+
+                    result.append(
+                            money(totalPaid)
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"previous_pending\":"
+                    );
+
+                    result.append(
+                            money(previousPending)
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"pending_balance\":"
+                    );
+
+                    result.append(
+                            money(pending)
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"remarks\":"
+                    );
+
+                    result.append(
+                            Json.quote(
+                                    rs.getString(
+                                            "remarks"
+                                    )
+                            )
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"adjustments\":"
+                    );
+
+                    appendAdjustments(
+                            conn,
+                            rs.getInt("student_id"),
+                            result
+                    );
+
+                    result.append(",");
+
+                    result.append(
+                            "\"payments\":"
+                    );
+
+                    appendPayments(
+                            conn,
+                            rs.getInt("student_id"),
+                            result
+                    );
+
+                    result.append("}");
+
+                    return result.toString();
+                }
+            }
+        }
+
+        private void appendAdjustments(
+                Connection conn,
+                int studentId,
+                StringBuilder result)
+                throws SQLException {
+
+            result.append("[");
+
+            String sql =
+                    "SELECT " +
+                    "adjustment_id," +
+                    "old_bill," +
+                    "new_bill," +
+                    "adjustment_amount," +
+                    "reason," +
+                    "created_at " +
+                    "FROM fee_adjustments " +
+                    "WHERE student_id=? " +
+                    "ORDER BY adjustment_id ASC";
+
+            boolean first = true;
+
+            try (PreparedStatement stmt =
+                         conn.prepareStatement(sql)) {
+
+                stmt.setInt(
+                        1,
+                        studentId
+                );
+
+                try (ResultSet rs =
+                             stmt.executeQuery()) {
+
+                    while (rs.next()) {
+
+                        if (!first) {
+                            result.append(",");
+                        }
+
+                        first = false;
+
+                        result.append("{");
+
+                        result.append(
+                                "\"adjustment_id\":"
+                        );
+
+                        result.append(
+                                rs.getLong(
+                                        "adjustment_id"
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"old_bill\":"
+                        );
+
+                        result.append(
+                                money(
+                                        rs.getBigDecimal(
+                                                "old_bill"
+                                        )
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"new_bill\":"
+                        );
+
+                        result.append(
+                                money(
+                                        rs.getBigDecimal(
+                                                "new_bill"
+                                        )
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"adjustment_amount\":"
+                        );
+
+                        result.append(
+                                money(
+                                        rs.getBigDecimal(
+                                                "adjustment_amount"
+                                        )
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"reason\":"
+                        );
+
+                        result.append(
+                                Json.quote(
+                                        rs.getString(
+                                                "reason"
+                                        )
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"date\":"
+                        );
+
+                        result.append(
+                                Json.quote(
+                                        String.valueOf(
+                                                rs.getTimestamp(
+                                                        "created_at"
+                                                )
+                                        )
+                                )
+                        );
+
+                        result.append("}");
+                    }
+                }
+            }
+
+            result.append("]");
+        }
+
+        private void appendPayments(
+                Connection conn,
+                int studentId,
+                StringBuilder result)
+                throws SQLException {
+
+            result.append("[");
+
+            String sql =
+                    "SELECT " +
+                    "transaction_id," +
+                    "amount_paid," +
+                    "payment_date," +
+                    "remarks " +
+                    "FROM fee_transactions " +
+                    "WHERE student_id=? " +
+                    "ORDER BY transaction_id ASC";
+
+            boolean first = true;
+
+            try (PreparedStatement stmt =
+                         conn.prepareStatement(sql)) {
+
+                stmt.setInt(
+                        1,
+                        studentId
+                );
+
+                try (ResultSet rs =
+                             stmt.executeQuery()) {
+
+                    while (rs.next()) {
+
+                        if (!first) {
+                            result.append(",");
+                        }
+
+                        first = false;
+
+                        result.append("{");
+
+                        result.append(
+                                "\"transaction_id\":"
+                        );
+
+                        result.append(
+                                rs.getLong(
+                                        "transaction_id"
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"amount\":"
+                        );
+
+                        result.append(
+                                money(
+                                        rs.getBigDecimal(
+                                                "amount_paid"
+                                        )
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"date\":"
+                        );
+
+                        Timestamp timestamp =
+                                rs.getTimestamp(
+                                        "payment_date"
+                                );
+
+                        String formattedDate = "";
+
+                        if (timestamp != null) {
+
+                            formattedDate =
+                                    timestamp
+                                            .toInstant()
+                                            .atZone(
+                                                    INDIA_ZONE
+                                            )
+                                            .format(
+                                                    PAYMENT_DATE_FORMAT
+                                            );
+                        }
+
+                        result.append(
+                                Json.quote(
+                                        formattedDate
+                                )
+                        );
+
+                        result.append(",");
+
+                        result.append(
+                                "\"remarks\":"
+                        );
+
+                        result.append(
+                                Json.quote(
+                                        rs.getString(
+                                                "remarks"
+                                        )
+                                )
+                        );
+
+                        result.append("}");
+                    }
+                }
+            }
+
+            result.append("]");
         }
     }
 
@@ -1607,7 +3020,6 @@ public class Server {
                         "/index.html";
             }
 
-            // Remove leading slash.
             String relativePath =
                     requestPath.startsWith("/")
                             ? requestPath.substring(1)
@@ -1617,10 +3029,6 @@ public class Server {
                     PUBLIC_DIR
                             .resolve(relativePath)
                             .normalize();
-
-            // --------------------------------------------------------
-            // Prevent path traversal
-            // --------------------------------------------------------
 
             if (!requested.startsWith(
                     PUBLIC_DIR)) {
@@ -1634,11 +3042,8 @@ public class Server {
                 return;
             }
 
-            // --------------------------------------------------------
-            // File does not exist
-            // --------------------------------------------------------
-
-            if (!Files.exists(requested)) {
+            if (!Files.exists(requested) ||
+                    Files.isDirectory(requested)) {
 
                 sendError(
                         exchange,
@@ -1649,39 +3054,10 @@ public class Server {
                 return;
             }
 
-            if (Files.isDirectory(requested)) {
-
-                sendError(
-                        exchange,
-                        404,
-                        "Page not found"
-                );
-
-                return;
-            }
-
-            byte[] data;
-
-            try {
-
-                data =
-                        Files.readAllBytes(
-                                requested
-                        );
-
-            } catch (IOException e) {
-
-                sendError(
-                        exchange,
-                        500,
-                        "Unable to read file"
-                );
-
-                return;
-            }
-
-            String contentType =
-                    contentType(requested);
+            byte[] data =
+                    Files.readAllBytes(
+                            requested
+                    );
 
             securityHeaders(exchange);
 
@@ -1689,7 +3065,7 @@ public class Server {
                     .getResponseHeaders()
                     .set(
                             "Content-Type",
-                            contentType
+                            contentType(requested)
                     );
 
             exchange.sendResponseHeaders(
@@ -1703,10 +3079,6 @@ public class Server {
                 output.write(data);
             }
         }
-
-        // ========================================================
-        // CONTENT TYPE
-        // ========================================================
 
         private String contentType(
                 Path file) {
@@ -1814,7 +3186,7 @@ public class Server {
             if (id <= 0) {
 
                 throw new IllegalArgumentException(
-                        "Invalid student ID"
+                        "Invalid ID"
                 );
             }
 
@@ -1823,12 +3195,12 @@ public class Server {
         } catch (NumberFormatException e) {
 
             throw new IllegalArgumentException(
-                    "Invalid student ID"
+                    "Invalid ID"
             );
         }
     }
 
-    private static double parseMoney(
+    private static BigDecimal parseMoney(
             String value) {
 
         if (value == null ||
@@ -1841,19 +3213,23 @@ public class Server {
 
         try {
 
-            double result =
-                    Double.parseDouble(
+            BigDecimal amount =
+                    new BigDecimal(
                             value.trim()
                     );
 
-            if (!Double.isFinite(result)) {
+            if (amount.compareTo(
+                    BigDecimal.ZERO
+            ) < 0) {
 
                 throw new IllegalArgumentException(
-                        "Invalid monetary value"
+                        "Monetary value cannot be negative"
                 );
             }
 
-            return result;
+            return normalizeMoney(
+                    amount
+            );
 
         } catch (NumberFormatException e) {
 
@@ -1863,14 +3239,35 @@ public class Server {
         }
     }
 
-    private static String money(
-            double value) {
+    private static BigDecimal moneyValue(
+            BigDecimal value) {
 
-        return String.format(
-                Locale.US,
-                "%.2f",
-                value
+        if (value == null) {
+
+            return BigDecimal.ZERO.setScale(
+                    2,
+                    RoundingMode.HALF_UP
+            );
+        }
+
+        return normalizeMoney(value);
+    }
+
+    private static BigDecimal normalizeMoney(
+            BigDecimal value) {
+
+        return value.setScale(
+                2,
+                RoundingMode.HALF_UP
         );
+    }
+
+    private static String money(
+            BigDecimal value) {
+
+        return normalizeMoney(
+                value
+        ).toPlainString();
     }
 
     // ============================================================
@@ -1907,7 +3304,8 @@ public class Server {
                 String key =
                         URLDecoder.decode(
                                 pair,
-                                "UTF-8"
+                                StandardCharsets.UTF_8
+                                        .name()
                         );
 
                 result.put(
@@ -1924,7 +3322,8 @@ public class Server {
                                     0,
                                     equals
                             ),
-                            "UTF-8"
+                            StandardCharsets.UTF_8
+                                    .name()
                     );
 
             String value =
@@ -1932,7 +3331,8 @@ public class Server {
                             pair.substring(
                                     equals + 1
                             ),
-                            "UTF-8"
+                            StandardCharsets.UTF_8
+                                    .name()
                     );
 
             result.put(
@@ -1945,14 +3345,10 @@ public class Server {
     }
 
     // ============================================================
-    // MINIMAL JSON PARSER
+    // JSON
     // ============================================================
 
     static class Json {
-
-        // --------------------------------------------------------
-        // Parse JSON object
-        // --------------------------------------------------------
 
         static Map<String, String> parse(
                 String input) {
@@ -2030,7 +3426,6 @@ public class Server {
                         parser.read();
 
                 if (next == '}') {
-
                     break;
                 }
 
@@ -2054,15 +3449,10 @@ public class Server {
             return result;
         }
 
-        // --------------------------------------------------------
-        // Quote JSON string
-        // --------------------------------------------------------
-
         static String quote(
                 String value) {
 
             if (value == null) {
-
                 return "null";
             }
 
@@ -2158,10 +3548,6 @@ public class Server {
             return result.toString();
         }
 
-        // ========================================================
-        // JSON PARSER
-        // ========================================================
-
         static class Parser {
 
             private final String input;
@@ -2227,10 +3613,6 @@ public class Server {
                     position++;
                 }
             }
-
-            // ----------------------------------------------------
-            // Read JSON string
-            // ----------------------------------------------------
 
             String readString() {
 
@@ -2374,10 +3756,6 @@ public class Server {
                 );
             }
 
-            // ----------------------------------------------------
-            // Read JSON value
-            // ----------------------------------------------------
-
             String readValue() {
 
                 if (peek() == '"') {
@@ -2419,13 +3797,7 @@ public class Server {
                                 position
                         );
 
-                /*
-                 * Convert JSON null to empty string because
-                 * this application uses String values internally.
-                 */
-
                 if ("null".equals(value)) {
-
                     return "";
                 }
 
