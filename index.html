@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -58,7 +59,7 @@
             padding: 20px;
             border-radius: 8px;
             border-top: 4px solid #cbd5e1;
-            box-shadow: 0 4px 12px rgba(0,0,0,.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, .05);
             cursor: pointer;
             transition: .2s;
         }
@@ -99,7 +100,7 @@
             background: white;
             padding: 30px;
             border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, .05);
             display: none;
         }
 
@@ -131,7 +132,7 @@
         input:focus,
         textarea:focus {
             border-color: #2563eb;
-            box-shadow: 0 0 0 2px rgba(37,99,235,.1);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, .1);
         }
 
         button {
@@ -239,7 +240,7 @@
             inset: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,.55);
+            background: rgba(0, 0, 0, .55);
             z-index: 1000;
             overflow-y: auto;
         }
@@ -297,495 +298,388 @@
 
 <body>
 
-<div class="wrapper">
+    <div class="wrapper">
 
-    <div class="brand-header">
-        <div>
-            <h1>PAL INDIA COMPUTER EDUCATION</h1>
-            <span>Student & Fee Management System</span>
+        <div class="brand-header">
+            <div>
+                <h1>PAL INDIA COMPUTER EDUCATION</h1>
+                <span>Student & Fee Management System</span>
+            </div>
+
+            <span id="connectionBadge">
+                Checking API...
+            </span>
         </div>
 
-        <span id="connectionBadge">
-            Checking API...
-        </span>
-    </div>
+        <!-- NAVIGATION -->
 
-    <!-- NAVIGATION -->
+        <div class="tab-menu-grid">
 
-    <div class="tab-menu-grid">
+            <div class="nav-card active-tab-admissions" onclick="routeActiveTab('section-admissions')">
 
-        <div
-            class="nav-card active-tab-admissions"
-            onclick="routeActiveTab('section-admissions')">
+                <h3>Admissions Hub</h3>
 
-            <h3>Admissions Hub</h3>
+                <p>
+                    Register new students and course information.
+                </p>
+            </div>
 
-            <p>
-                Register new students and course information.
-            </p>
-        </div>
+            <div class="nav-card active-tab-fees" onclick="routeActiveTab('section-fees')">
 
-        <div
-            class="nav-card active-tab-fees"
-            onclick="routeActiveTab('section-fees')">
+                <h3>Fees Structure</h3>
 
-            <h3>Fees Structure</h3>
+                <p>
+                    Select a student and record installment payments.
+                </p>
+            </div>
 
-            <p>
-                Select a student and record installment payments.
-            </p>
-        </div>
+            <div class="nav-card active-tab-search" onclick="routeActiveTab('section-search')">
 
-        <div
-            class="nav-card active-tab-search"
-            onclick="routeActiveTab('section-search')">
+                <h3>Search & Modify</h3>
 
-            <h3>Search & Modify</h3>
+                <p>
+                    Search records and update student information.
+                </p>
+            </div>
 
-            <p>
-                Search records and update student information.
-            </p>
-        </div>
+            <div class="nav-card active-tab-admin" onclick="routeActiveTab('section-admin')">
 
-        <div
-            class="nav-card active-tab-admin"
-            onclick="routeActiveTab('section-admin')">
+                <h3>Admin Panel</h3>
 
-            <h3>Admin Panel</h3>
-
-            <p>
-                Check API and database status.
-            </p>
-        </div>
-
-    </div>
-
-
-    <!-- ADMISSIONS -->
-
-    <section
-        id="section-admissions"
-        class="workspace-panel">
-
-        <h2>Admissions Office</h2>
-
-        <div style="max-width:600px">
-
-            <label for="student_name_input">
-                Student Name
-            </label>
-
-            <input
-                type="text"
-                id="student_name_input"
-                maxlength="150"
-                autocomplete="name"
-            >
-
-            <label for="mobile_no_input">
-                Mobile Number
-            </label>
-
-            <input
-                type="text"
-                id="mobile_no_input"
-                maxlength="30"
-                autocomplete="tel"
-            >
-
-            <label for="address_input">
-                Address
-            </label>
-
-            <input
-                type="text"
-                id="address_input"
-                maxlength="500"
-            >
-
-            <label for="course_input">
-                Course
-            </label>
-
-            <input
-                type="text"
-                id="course_input"
-                maxlength="150"
-            >
-
-            <label for="bill_input">
-                Course Fee (INR)
-            </label>
-
-            <input
-                type="number"
-                step="0.01"
-                min="0"
-                id="bill_input"
-            >
-
-            <label for="admission_date_input">
-                Date of Admission
-            </label>
-
-            <input
-                type="date"
-                id="admission_date_input"
-            >
-
-            <button
-                onclick="executeAdmissionPost()">
-
-                Save Student
-            </button>
-
-            <div
-                id="admissionStatus"
-                class="status">
+                <p>
+                    Check API and database status.
+                </p>
             </div>
 
         </div>
 
-    </section>
 
+        <!-- ADMISSIONS -->
 
-    <!-- FEES -->
+        <section id="section-admissions" class="workspace-panel">
 
-    <section
-        id="section-fees"
-        class="workspace-panel">
+            <h2>Admissions Office</h2>
 
-        <h2>Fee Payment</h2>
+            <div style="max-width:600px">
 
-        <div class="selected-box">
+                <label for="student_name_input">
+                    Student Name
+                </label>
 
-            <strong>Selected Student</strong>
+                <input type="text" id="student_name_input" maxlength="150" autocomplete="name">
 
-            <p>
-                ID:
-                <span id="terminal_id">
-                    None
-                </span>
-            </p>
+                <label for="mobile_no_input">
+                    Mobile Number
+                </label>
 
-            <p>
-                Name:
-                <span id="terminal_name">
-                    No student selected.
-                </span>
-            </p>
+                <input type="text" id="mobile_no_input" maxlength="30" autocomplete="tel">
 
-            <p>
-                Course:
-                <span id="terminal_course">
-                    None
-                </span>
-            </p>
+                <label for="address_input">
+                    Address
+                </label>
 
-            <p>
-                Pending:
-                <strong id="terminal_pending">
-                    ₹0.00
-                </strong>
-            </p>
+                <input type="text" id="address_input" maxlength="500">
 
-            <button
-                class="secondary"
-                onclick="routeActiveTab('section-search')">
+                <label for="course_input">
+                    Course
+                </label>
 
-                Select Student From Search
-            </button>
+                <input type="text" id="course_input" maxlength="150">
 
-        </div>
+                <label for="bill_input">
+                    Course Fee (INR)
+                </label>
 
-        <div style="max-width:600px">
+                <input type="number" step="0.01" min="0" id="bill_input">
 
-            <label for="payment_amount_input">
-                Amount Paid
-            </label>
+                <label for="admission_date_input">
+                    Date of Admission
+                </label>
 
-            <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                id="payment_amount_input"
-            >
+                <input type="date" id="admission_date_input">
 
-            <label for="payment_remarks_input">
-                Month / Remarks
-            </label>
+                <button onclick="executeAdmissionPost()">
 
-            <input
-                type="text"
-                id="payment_remarks_input"
-                maxlength="255"
-                placeholder="Installment Entry"
-            >
+                    Save Student
+                </button>
 
-            <button
-                class="success"
-                onclick="postPaymentTransaction()">
+                <div id="admissionStatus" class="status">
+                </div>
 
-                Post Payment
-            </button>
-
-            <div
-                id="paymentStatus"
-                class="status">
             </div>
 
-        </div>
-
-    </section>
+        </section>
 
 
-    <!-- SEARCH -->
+        <!-- FEES -->
 
-    <section
-        id="section-search"
-        class="workspace-panel">
+        <section id="section-fees" class="workspace-panel">
 
-        <h2>Student Database</h2>
+            <h2>Fee Payment</h2>
 
-        <p class="muted">
-            Click a row to select the student.
-            Double-click to edit the student.
-        </p>
+            <div class="selected-box">
 
-        <div class="search-row">
+                <strong>Selected Student</strong>
 
-            <input
-                type="text"
-                id="ledgerSearchFilter"
-                placeholder="Search name, mobile, course or address..."
-                oninput="debouncedLedgerQuery()"
-            >
+                <p>
+                    ID:
+                    <span id="terminal_id">
+                        None
+                    </span>
+                </p>
 
-            <button
-                onclick="runLedgerQuery()">
+                <p>
+                    Name:
+                    <span id="terminal_name">
+                        No student selected.
+                    </span>
+                </p>
 
-                Search
-            </button>
+                <p>
+                    Course:
+                    <span id="terminal_course">
+                        None
+                    </span>
+                </p>
 
-        </div>
+                <p>
+                    Pending:
+                    <strong id="terminal_pending">
+                        ₹0.00
+                    </strong>
+                </p>
 
-        <div class="table-wrap">
+                <button class="secondary" onclick="routeActiveTab('section-search')">
 
-            <table>
+                    Select Student From Search
+                </button>
 
-                <thead>
+            </div>
 
-                <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Mobile</th>
-                    <th>Address</th>
-                    <th>Course</th>
-                    <th>Bill</th>
-                    <th>Pending</th>
-                    <th>Notes</th>
-                </tr>
+            <div style="max-width:600px">
 
-                </thead>
+                <label for="payment_amount_input">
+                    Amount Paid
+                </label>
 
-                <tbody id="ledgerRowsContainer">
-                </tbody>
+                <input type="number" step="0.01" min="0.01" id="payment_amount_input">
 
-            </table>
+                <label for="payment_remarks_input">
+                    Month / Remarks
+                </label>
 
-        </div>
+                <input type="text" id="payment_remarks_input" maxlength="255" placeholder="Installment Entry">
 
-    </section>
+                <button class="success" onclick="postPaymentTransaction()">
+
+                    Post Payment
+                </button>
+
+                <div id="paymentStatus" class="status">
+                </div>
+
+            </div>
+
+        </section>
 
 
-    <!-- ADMIN -->
+        <!-- SEARCH -->
 
-    <section
-        id="section-admin"
-        class="workspace-panel">
+        <section id="section-search" class="workspace-panel">
 
-        <h2>System Administration</h2>
+            <h2>Student Database</h2>
 
-        <div class="grid-2">
+            <p class="muted">
+                Click a row to select the student.
+                Double-click to edit the student.
+            </p>
 
-            <div
-                style="
+            <div class="search-row">
+
+                <input type="text" id="ledgerSearchFilter" placeholder="Search name, mobile, course or address..."
+                    oninput="debouncedLedgerQuery()">
+
+                <button onclick="runLedgerQuery()">
+
+                    Search
+                </button>
+
+            </div>
+
+            <div class="table-wrap">
+
+                <table>
+
+                    <thead>
+
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Mobile</th>
+                            <th>Address</th>
+                            <th>Course</th>
+                            <th>Bill</th>
+                            <th>Pending</th>
+                            <th>Notes</th>
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="ledgerRowsContainer">
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+        <!-- ADMIN -->
+
+        <section id="section-admin" class="workspace-panel">
+
+            <h2>System Administration</h2>
+
+            <div class="grid-2">
+
+                <div style="
                 background:#f8fafc;
                 padding:20px;
                 border-radius:6px;
                 border:1px solid #e2e8f0;
                 ">
 
-                <h4>API / Database Status</h4>
+                    <h4>API / Database Status</h4>
 
-                <div
-                    id="db_status_badge"
-                    style="
+                    <div id="db_status_badge" style="
                     font-weight:bold;
                     color:#ea580c;
                     font-size:18px;
                     ">
 
-                    CHECKING...
+                        CHECKING...
+
+                    </div>
+
+                    <button onclick="runInfrastructureAudit()">
+
+                        Run Health Check
+                    </button>
 
                 </div>
 
-                <button
-                    onclick="runInfrastructureAudit()">
-
-                    Run Health Check
-                </button>
-
-            </div>
-
-            <div
-                style="
+                <div style="
                 background:#f8fafc;
                 padding:20px;
                 border-radius:6px;
                 border:1px solid #e2e8f0;
                 ">
 
-                <p>
-                    <strong>
-                        Total Students:
-                    </strong>
+                    <p>
+                        <strong>
+                            Total Students:
+                        </strong>
 
-                    <span
-                        id="audit_scholars_count"
-                        style="
+                        <span id="audit_scholars_count" style="
                         font-weight:bold;
                         font-size:18px;
                         color:#2563eb;
                         ">
 
-                        0
+                            0
 
-                    </span>
-                </p>
+                        </span>
+                    </p>
 
-                <p>
-                    <strong>
-                        Active Courses:
-                    </strong>
+                    <p>
+                        <strong>
+                            Active Courses:
+                        </strong>
 
-                    <span
-                        id="audit_programs_count"
-                        style="
+                        <span id="audit_programs_count" style="
                         font-weight:bold;
                         font-size:18px;
                         color:#2563eb;
                         ">
 
-                        0
+                            0
 
-                    </span>
-                </p>
+                        </span>
+                    </p>
+
+                </div>
 
             </div>
 
-        </div>
-
-    </section>
+        </section>
 
 
-    <!-- EDIT MODAL -->
+        <!-- EDIT MODAL -->
 
-    <div
-        id="modifyProfilerPanel"
-        class="modal-overlay">
+        <div id="modifyProfilerPanel" class="modal-overlay">
 
-        <div class="modal-inner">
+            <div class="modal-inner">
 
-            <h3>
-                Edit Student
-            </h3>
+                <h3>
+                    Edit Student
+                </h3>
 
-            <input
-                type="hidden"
-                id="profiler_student_id"
-            >
+                <input type="hidden" id="profiler_student_id">
 
-            <label>
-                Name
-            </label>
+                <label>
+                    Name
+                </label>
 
-            <input
-                type="text"
-                id="profiler_name"
-                maxlength="150"
-            >
+                <input type="text" id="profiler_name" maxlength="150">
 
-            <label>
-                Mobile
-            </label>
+                <label>
+                    Mobile
+                </label>
 
-            <input
-                type="text"
-                id="profiler_mobile"
-                maxlength="30"
-            >
+                <input type="text" id="profiler_mobile" maxlength="30">
 
-            <label>
-                Address
-            </label>
+                <label>
+                    Address
+                </label>
 
-            <input
-                type="text"
-                id="profiler_address"
-                maxlength="500"
-            >
+                <input type="text" id="profiler_address" maxlength="500">
 
-            <label>
-                Course
-            </label>
+                <label>
+                    Course
+                </label>
 
-            <input
-                type="text"
-                id="profiler_course"
-                maxlength="150"
-            >
+                <input type="text" id="profiler_course" maxlength="150">
 
-            <label>
-                Gross Tuition
-            </label>
+                <label>
+                    Gross Tuition
+                </label>
 
-            <input
-                type="number"
-                step="0.01"
-                min="0"
-                id="profiler_bill"
-            >
+                <input type="number" step="0.01" min="0" id="profiler_bill">
 
-            <label>
-                Profile Notes
-            </label>
+                <label>
+                    Profile Notes
+                </label>
 
-            <textarea
-                id="profiler_notes"
-                rows="3"
-                maxlength="1000">
+                <textarea id="profiler_notes" rows="3" maxlength="1000">
             </textarea>
 
-            <div
-                style="
+                <div style="
                 text-align:right;
                 margin-top:20px;
                 ">
 
-                <button
-                    class="secondary"
-                    onclick="closeProfiler()">
+                    <button class="secondary" onclick="closeProfiler()">
 
-                    Cancel
-                </button>
+                        Cancel
+                    </button>
 
-                <button
-                    class="success"
-                    onclick="saveGlobalUpdates()">
+                    <button class="success" onclick="saveGlobalUpdates()">
 
-                    Save Changes
-                </button>
+                        Save Changes
+                    </button>
+
+                </div>
 
             </div>
 
@@ -793,311 +687,429 @@
 
     </div>
 
-</div>
 
+    <script src="api-config.js"></script>
 
-<script src="api-config.js"></script>
+    <script>
 
-<script>
+        /*
+         * api-config.js defines:
+         *
+         * window.PAL_INDIA_API
+         *
+         * Local example:
+         * http://localhost:8080/api
+         *
+         * Later:
+         * https://your-railway-domain.up.railway.app/api
+         */
 
-    /*
-     * api-config.js defines:
-     *
-     * window.PAL_INDIA_API
-     *
-     * Local example:
-     * http://localhost:8080/api
-     *
-     * Later:
-     * https://your-railway-domain.up.railway.app/api
-     */
-
-    const API_BASE =
-        (
-            window.PAL_INDIA_API ||
+        const API_BASE =
             (
-                location.hostname === "localhost" ||
-                location.hostname === "127.0.0.1"
-                    ? "http://localhost:8080/api"
-                    : "/api"
-            )
-        ).replace(/\/+$/, "");
-
-    let activeSelectedScholar = null;
-
-    let searchTimer = null;
-
-
-    // ============================================================
-    // STARTUP
-    // ============================================================
-
-    window.addEventListener(
-        "DOMContentLoaded",
-        () => {
-
-            const today =
-                new Date()
-                    .toISOString()
-                    .split("T")[0];
-
-            document
-                .getElementById(
-                    "admission_date_input"
+                window.PAL_INDIA_API ||
+                (
+                    location.hostname === "localhost" ||
+                        location.hostname === "127.0.0.1"
+                        ? "http://localhost:8080/api"
+                        : "/api"
                 )
-                .value = today;
+            ).replace(/\/+$/, "");
 
-            routeActiveTab(
-                "section-admissions"
-            );
+        let activeSelectedScholar = null;
 
-            runInfrastructureAudit();
-        }
-    );
+        let searchTimer = null;
 
 
-    // ============================================================
-    // NAVIGATION
-    // ============================================================
+        // ============================================================
+        // STARTUP
+        // ============================================================
 
-    function routeActiveTab(
-        targetSectionId
-    ) {
+        window.addEventListener(
+            "DOMContentLoaded",
+            () => {
 
-        document
-            .querySelectorAll(
-                ".workspace-panel"
-            )
-            .forEach(
-                panel => {
-                    panel.style.display = "none";
-                }
-            );
+                const today =
+                    new Date()
+                        .toISOString()
+                        .split("T")[0];
 
-        const active =
-            document.getElementById(
-                targetSectionId
-            );
+                document
+                    .getElementById(
+                        "admission_date_input"
+                    )
+                    .value = today;
 
-        if (!active) {
-            return;
-        }
-
-        active.style.display = "block";
-
-        if (
-            targetSectionId ===
-            "section-search"
-        ) {
-
-            runLedgerQuery();
-        }
-    }
-
-
-    // ============================================================
-    // API REQUEST HELPER
-    // ============================================================
-
-    async function apiFetch(
-        path,
-        options = {}
-    ) {
-
-        const response =
-            await fetch(
-                API_BASE + path,
-                {
-                    ...options,
-                    headers: {
-                        "Content-Type":
-                            "application/json",
-                        ...(options.headers || {})
-                    }
-                }
-            );
-
-        let data = null;
-
-        try {
-            data = await response.json();
-        } catch (_) {
-            data = null;
-        }
-
-        if (!response.ok) {
-
-            throw new Error(
-                data?.error ||
-                `Server returned HTTP ${response.status}`
-            );
-        }
-
-        return data;
-    }
-
-
-    // ============================================================
-    // ADMISSION
-    // ============================================================
-
-    async function executeAdmissionPost() {
-
-        const payload = {
-
-            name:
-                valueOf(
-                    "student_name_input"
-                ),
-
-            mobile_no:
-                valueOf(
-                    "mobile_no_input"
-                ),
-
-            address:
-                valueOf(
-                    "address_input"
-                ),
-
-            course:
-                valueOf(
-                    "course_input"
-                ),
-
-            bill:
-                valueOf(
-                    "bill_input"
-                ) || "0",
-
-            date_of_admission:
-                valueOf(
-                    "admission_date_input"
-                )
-        };
-
-        if (
-            !payload.name ||
-            !payload.mobile_no ||
-            !payload.address ||
-            !payload.course
-        ) {
-
-            showStatus(
-                "admissionStatus",
-                "Please fill Name, Mobile, Address and Course.",
-                false
-            );
-
-            return;
-        }
-
-        try {
-
-            const data =
-                await apiFetch(
-                    "/students",
-                    {
-                        method: "POST",
-                        body:
-                            JSON.stringify(
-                                payload
-                            )
-                    }
+                routeActiveTab(
+                    "section-admissions"
                 );
-
-            if (data.success) {
-
-                showStatus(
-                    "admissionStatus",
-                    `Student saved successfully. ID: ${data.id}`,
-                    true
-                );
-
-                clearAdmissionForm();
 
                 runInfrastructureAudit();
             }
-
-        } catch (error) {
-
-            showStatus(
-                "admissionStatus",
-                error.message,
-                false
-            );
-        }
-    }
+        );
 
 
-    function clearAdmissionForm() {
+        // ============================================================
+        // NAVIGATION
+        // ============================================================
 
-        document.getElementById(
-            "student_name_input"
-        ).value = "";
+        function routeActiveTab(
+            targetSectionId
+        ) {
 
-        document.getElementById(
-            "mobile_no_input"
-        ).value = "";
-
-        document.getElementById(
-            "address_input"
-        ).value = "";
-
-        document.getElementById(
-            "course_input"
-        ).value = "";
-
-        document.getElementById(
-            "bill_input"
-        ).value = "";
-    }
-
-
-    // ============================================================
-    // SEARCH
-    // ============================================================
-
-    function debouncedLedgerQuery() {
-
-        clearTimeout(searchTimer);
-
-        searchTimer =
-            setTimeout(
-                runLedgerQuery,
-                300
-            );
-    }
-
-
-    async function runLedgerQuery() {
-
-        const filter =
-            valueOf(
-                "ledgerSearchFilter"
-            );
-
-        const container =
-            document.getElementById(
-                "ledgerRowsContainer"
-            );
-
-        container.textContent = "";
-
-        try {
-
-            const records =
-                await apiFetch(
-                    "/students/search?filter=" +
-                    encodeURIComponent(
-                        filter
-                    )
+            document
+                .querySelectorAll(
+                    ".workspace-panel"
+                )
+                .forEach(
+                    panel => {
+                        panel.style.display = "none";
+                    }
                 );
 
+            const active =
+                document.getElementById(
+                    targetSectionId
+                );
+
+            if (!active) {
+                return;
+            }
+
+            active.style.display = "block";
+
             if (
-                !Array.isArray(records) ||
-                records.length === 0
+                targetSectionId ===
+                "section-search"
             ) {
+
+                runLedgerQuery();
+            }
+        }
+
+
+        // ============================================================
+        // API REQUEST HELPER
+        // ============================================================
+
+        async function apiFetch(
+            path,
+            options = {}
+        ) {
+
+            const response =
+                await fetch(
+                    API_BASE + path,
+                    {
+                        ...options,
+                        headers: {
+                            "Content-Type":
+                                "application/json",
+                            ...(options.headers || {})
+                        }
+                    }
+                );
+
+            let data = null;
+
+            try {
+                data = await response.json();
+            } catch (_) {
+                data = null;
+            }
+
+            if (!response.ok) {
+
+                throw new Error(
+                    data?.error ||
+                    `Server returned HTTP ${response.status}`
+                );
+            }
+
+            return data;
+        }
+
+
+        // ============================================================
+        // ADMISSION
+        // ============================================================
+
+        async function executeAdmissionPost() {
+
+            const payload = {
+
+                name:
+                    valueOf(
+                        "student_name_input"
+                    ),
+
+                mobile_no:
+                    valueOf(
+                        "mobile_no_input"
+                    ),
+
+                address:
+                    valueOf(
+                        "address_input"
+                    ),
+
+                course:
+                    valueOf(
+                        "course_input"
+                    ),
+
+                bill:
+                    valueOf(
+                        "bill_input"
+                    ) || "0",
+
+                date_of_admission:
+                    valueOf(
+                        "admission_date_input"
+                    )
+            };
+
+            if (
+                !payload.name ||
+                !payload.mobile_no ||
+                !payload.address ||
+                !payload.course
+            ) {
+
+                showStatus(
+                    "admissionStatus",
+                    "Please fill Name, Mobile, Address and Course.",
+                    false
+                );
+
+                return;
+            }
+
+            try {
+
+                const data =
+                    await apiFetch(
+                        "/students",
+                        {
+                            method: "POST",
+                            body:
+                                JSON.stringify(
+                                    payload
+                                )
+                        }
+                    );
+
+                if (data.success) {
+
+                    showStatus(
+                        "admissionStatus",
+                        `Student saved successfully. ID: ${data.id}`,
+                        true
+                    );
+
+                    clearAdmissionForm();
+
+                    runInfrastructureAudit();
+                }
+
+            } catch (error) {
+
+                showStatus(
+                    "admissionStatus",
+                    error.message,
+                    false
+                );
+            }
+        }
+
+
+        function clearAdmissionForm() {
+
+            document.getElementById(
+                "student_name_input"
+            ).value = "";
+
+            document.getElementById(
+                "mobile_no_input"
+            ).value = "";
+
+            document.getElementById(
+                "address_input"
+            ).value = "";
+
+            document.getElementById(
+                "course_input"
+            ).value = "";
+
+            document.getElementById(
+                "bill_input"
+            ).value = "";
+        }
+
+
+        // ============================================================
+        // SEARCH
+        // ============================================================
+
+        function debouncedLedgerQuery() {
+
+            clearTimeout(searchTimer);
+
+            searchTimer =
+                setTimeout(
+                    runLedgerQuery,
+                    300
+                );
+        }
+
+
+        async function runLedgerQuery() {
+
+            const filter =
+                valueOf(
+                    "ledgerSearchFilter"
+                );
+
+            const container =
+                document.getElementById(
+                    "ledgerRowsContainer"
+                );
+
+            container.textContent = "";
+
+            try {
+
+                const records =
+                    await apiFetch(
+                        "/students/search?filter=" +
+                        encodeURIComponent(
+                            filter
+                        )
+                    );
+
+                if (
+                    !Array.isArray(records) ||
+                    records.length === 0
+                ) {
+
+                    const row =
+                        document.createElement("tr");
+
+                    const cell =
+                        document.createElement("td");
+
+                    cell.colSpan = 8;
+
+                    cell.textContent =
+                        "No matching students found.";
+
+                    cell.style.textAlign =
+                        "center";
+
+                    cell.style.color =
+                        "grey";
+
+                    row.appendChild(cell);
+
+                    container.appendChild(row);
+
+                    return;
+                }
+
+                records.forEach(
+                    student => {
+
+                        const row =
+                            document.createElement("tr");
+
+                        row.style.cursor =
+                            "pointer";
+
+                        row.addEventListener(
+                            "click",
+                            () => {
+                                selectStudent(
+                                    student
+                                );
+                            }
+                        );
+
+                        row.addEventListener(
+                            "dblclick",
+                            () => {
+                                displayModifyProfilerPanel(
+                                    student
+                                );
+                            }
+                        );
+
+                        appendCell(
+                            row,
+                            student.id
+                        );
+
+                        const nameCell =
+                            appendCell(
+                                row,
+                                student.name
+                            );
+
+                        nameCell.style.fontWeight =
+                            "bold";
+
+                        appendCell(
+                            row,
+                            student.mobile_no
+                        );
+
+                        appendCell(
+                            row,
+                            student.address
+                        );
+
+                        appendCell(
+                            row,
+                            student.course
+                        );
+
+                        appendCell(
+                            row,
+                            "₹" +
+                            moneyNumber(
+                                student.bill
+                            )
+                        );
+
+                        const pendingCell =
+                            appendCell(
+                                row,
+                                "₹" +
+                                moneyNumber(
+                                    student.pending_balance
+                                )
+                            );
+
+                        pendingCell.style.color =
+                            Number(
+                                student.pending_balance
+                            ) > 0
+                                ? "#dc2626"
+                                : "#16a34a";
+
+                        pendingCell.style.fontWeight =
+                            "bold";
+
+                        appendCell(
+                            row,
+                            student.notes || ""
+                        );
+
+                        container.appendChild(
+                            row
+                        );
+                    }
+                );
+
+            } catch (error) {
 
                 const row =
                     document.createElement("tr");
@@ -1108,640 +1120,521 @@
                 cell.colSpan = 8;
 
                 cell.textContent =
-                    "No matching students found.";
-
-                cell.style.textAlign =
-                    "center";
+                    "Unable to load database: " +
+                    error.message;
 
                 cell.style.color =
-                    "grey";
+                    "#dc2626";
 
                 row.appendChild(cell);
 
                 container.appendChild(row);
-
-                return;
             }
+        }
 
-            records.forEach(
-                student => {
 
-                    const row =
-                        document.createElement("tr");
-
-                    row.style.cursor =
-                        "pointer";
-
-                    row.addEventListener(
-                        "click",
-                        () => {
-                            selectStudent(
-                                student
-                            );
-                        }
-                    );
-
-                    row.addEventListener(
-                        "dblclick",
-                        () => {
-                            displayModifyProfilerPanel(
-                                student
-                            );
-                        }
-                    );
-
-                    appendCell(
-                        row,
-                        student.id
-                    );
-
-                    const nameCell =
-                        appendCell(
-                            row,
-                            student.name
-                        );
-
-                    nameCell.style.fontWeight =
-                        "bold";
-
-                    appendCell(
-                        row,
-                        student.mobile_no
-                    );
-
-                    appendCell(
-                        row,
-                        student.address
-                    );
-
-                    appendCell(
-                        row,
-                        student.course
-                    );
-
-                    appendCell(
-                        row,
-                        "₹" +
-                        moneyNumber(
-                            student.bill
-                        )
-                    );
-
-                    const pendingCell =
-                        appendCell(
-                            row,
-                            "₹" +
-                            moneyNumber(
-                                student.pending_balance
-                            )
-                        );
-
-                    pendingCell.style.color =
-                        Number(
-                            student.pending_balance
-                        ) > 0
-                            ? "#dc2626"
-                            : "#16a34a";
-
-                    pendingCell.style.fontWeight =
-                        "bold";
-
-                    appendCell(
-                        row,
-                        student.notes || ""
-                    );
-
-                    container.appendChild(
-                        row
-                    );
-                }
-            );
-
-        } catch (error) {
-
-            const row =
-                document.createElement("tr");
+        function appendCell(
+            row,
+            value
+        ) {
 
             const cell =
                 document.createElement("td");
 
-            cell.colSpan = 8;
-
             cell.textContent =
-                "Unable to load database: " +
-                error.message;
-
-            cell.style.color =
-                "#dc2626";
+                value == null
+                    ? ""
+                    : String(value);
 
             row.appendChild(cell);
 
-            container.appendChild(row);
+            return cell;
         }
-    }
 
 
-    function appendCell(
-        row,
-        value
-    ) {
+        // ============================================================
+        // STUDENT SELECTION
+        // ============================================================
 
-        const cell =
-            document.createElement("td");
-
-        cell.textContent =
-            value == null
-                ? ""
-                : String(value);
-
-        row.appendChild(cell);
-
-        return cell;
-    }
-
-
-    // ============================================================
-    // STUDENT SELECTION
-    // ============================================================
-
-    function selectStudent(
-        student
-    ) {
-
-        activeSelectedScholar =
-            student;
-
-        document.getElementById(
-            "terminal_id"
-        ).textContent =
-            student.id;
-
-        document.getElementById(
-            "terminal_name"
-        ).textContent =
-            student.name;
-
-        document.getElementById(
-            "terminal_course"
-        ).textContent =
-            student.course;
-
-        document.getElementById(
-            "terminal_pending"
-        ).textContent =
-            "₹" +
-            moneyNumber(
-                student.pending_balance
-            );
-
-        routeActiveTab(
-            "section-fees"
-        );
-    }
-
-
-    // ============================================================
-    // EDIT STUDENT
-    // ============================================================
-
-    function displayModifyProfilerPanel(
-        student
-    ) {
-
-        document.getElementById(
-            "modifyProfilerPanel"
-        ).style.display =
-            "block";
-
-        document.getElementById(
-            "profiler_student_id"
-        ).value =
-            student.id;
-
-        document.getElementById(
-            "profiler_name"
-        ).value =
-            student.name || "";
-
-        document.getElementById(
-            "profiler_mobile"
-        ).value =
-            student.mobile_no || "";
-
-        document.getElementById(
-            "profiler_address"
-        ).value =
-            student.address || "";
-
-        document.getElementById(
-            "profiler_course"
-        ).value =
-            student.course || "";
-
-        document.getElementById(
-            "profiler_bill"
-        ).value =
-            student.bill || 0;
-
-        document.getElementById(
-            "profiler_notes"
-        ).value =
-            student.notes || "";
-    }
-
-
-    function closeProfiler() {
-
-        document.getElementById(
-            "modifyProfilerPanel"
-        ).style.display =
-            "none";
-    }
-
-
-    async function saveGlobalUpdates() {
-
-        const payload = {
-
-            id:
-                valueOf(
-                    "profiler_student_id"
-                ),
-
-            name:
-                valueOf(
-                    "profiler_name"
-                ),
-
-            mobile_no:
-                valueOf(
-                    "profiler_mobile"
-                ),
-
-            address:
-                valueOf(
-                    "profiler_address"
-                ),
-
-            course:
-                valueOf(
-                    "profiler_course"
-                ),
-
-            bill:
-                valueOf(
-                    "profiler_bill"
-                ) || "0",
-
-            notes:
-                valueOf(
-                    "profiler_notes"
-                )
-        };
-
-        if (
-            !payload.name ||
-            !payload.mobile_no ||
-            !payload.address ||
-            !payload.course
+        function selectStudent(
+            student
         ) {
 
-            alert(
-                "Please complete all required student fields."
-            );
-
-            return;
-        }
-
-        try {
-
-            const data =
-                await apiFetch(
-                    "/students",
-                    {
-                        method: "PUT",
-                        body:
-                            JSON.stringify(
-                                payload
-                            )
-                    }
-                );
-
-            if (data.success) {
-
-                closeProfiler();
-
-                await runLedgerQuery();
-
-                showStatus(
-                    "paymentStatus",
-                    "Student updated successfully.",
-                    true
-                );
-            }
-
-        } catch (error) {
-
-            alert(
-                "Unable to update student: " +
-                error.message
-            );
-        }
-    }
-
-
-    // ============================================================
-    // PAYMENTS
-    // ============================================================
-
-    async function postPaymentTransaction() {
-
-        if (!activeSelectedScholar) {
-
-            showStatus(
-                "paymentStatus",
-                "Select a student from Search & Modify first.",
-                false
-            );
-
-            return;
-        }
-
-        const amount =
-            valueOf(
-                "payment_amount_input"
-            );
-
-        if (!amount ||
-            Number(amount) <= 0) {
-
-            showStatus(
-                "paymentStatus",
-                "Enter a valid payment amount.",
-                false
-            );
-
-            return;
-        }
-
-        const payload = {
-
-            id:
-                String(
-                    activeSelectedScholar.id
-                ),
-
-            amount:
-
-                amount,
-
-            remarks:
-                valueOf(
-                    "payment_remarks_input"
-                ) ||
-                "Installment Entry"
-        };
-
-        try {
-
-            const data =
-                await apiFetch(
-                    "/payments",
-                    {
-                        method: "POST",
-                        body:
-                            JSON.stringify(
-                                payload
-                            )
-                    }
-                );
-
-            if (data.success) {
-
-                showStatus(
-                    "paymentStatus",
-                    "Payment posted successfully.",
-                    true
-                );
-
-                document.getElementById(
-                    "payment_amount_input"
-                ).value = "";
-
-                document.getElementById(
-                    "payment_remarks_input"
-                ).value = "";
-
-                // Refresh selected student.
-                await refreshSelectedStudent();
-
-                runInfrastructureAudit();
-            }
-
-        } catch (error) {
-
-            showStatus(
-                "paymentStatus",
-                error.message,
-                false
-            );
-        }
-    }
-
-
-    async function refreshSelectedStudent() {
-
-        if (!activeSelectedScholar) {
-            return;
-        }
-
-        const records =
-            await apiFetch(
-                "/students/search?filter=" +
-                encodeURIComponent(
-                    String(
-                        activeSelectedScholar.id
-                    )
-                )
-            );
-
-        const updated =
-            records.find(
-                student =>
-                    Number(student.id) ===
-                    Number(
-                        activeSelectedScholar.id
-                    )
-            );
-
-        if (updated) {
-
             activeSelectedScholar =
-                updated;
+                student;
+
+            document.getElementById(
+                "terminal_id"
+            ).textContent =
+                student.id;
+
+            document.getElementById(
+                "terminal_name"
+            ).textContent =
+                student.name;
+
+            document.getElementById(
+                "terminal_course"
+            ).textContent =
+                student.course;
 
             document.getElementById(
                 "terminal_pending"
             ).textContent =
                 "₹" +
                 moneyNumber(
-                    updated.pending_balance
+                    student.pending_balance
                 );
+
+            routeActiveTab(
+                "section-fees"
+            );
         }
-    }
 
 
-    // ============================================================
-    // HEALTH / ADMIN
-    // ============================================================
+        // ============================================================
+        // EDIT STUDENT
+        // ============================================================
 
-    async function runInfrastructureAudit() {
+        function displayModifyProfilerPanel(
+            student
+        ) {
 
-        const badge =
             document.getElementById(
-                "db_status_badge"
-            );
+                "modifyProfilerPanel"
+            ).style.display =
+                "block";
 
-        const connectionBadge =
             document.getElementById(
-                "connectionBadge"
-            );
+                "profiler_student_id"
+            ).value =
+                student.id;
 
-        badge.textContent =
-            "CHECKING...";
+            document.getElementById(
+                "profiler_name"
+            ).value =
+                student.name || "";
 
-        badge.style.color =
-            "#ea580c";
+            document.getElementById(
+                "profiler_mobile"
+            ).value =
+                student.mobile_no || "";
 
-        connectionBadge.textContent =
-            "Checking API...";
+            document.getElementById(
+                "profiler_address"
+            ).value =
+                student.address || "";
 
-        try {
+            document.getElementById(
+                "profiler_course"
+            ).value =
+                student.course || "";
 
-            await apiFetch(
-                "/health"
-            );
+            document.getElementById(
+                "profiler_bill"
+            ).value =
+                student.bill || 0;
 
-            const students =
-                await apiFetch(
-                    "/students/search?filter="
+            document.getElementById(
+                "profiler_notes"
+            ).value =
+                student.notes || "";
+        }
+
+
+        function closeProfiler() {
+
+            document.getElementById(
+                "modifyProfilerPanel"
+            ).style.display =
+                "none";
+        }
+
+
+        async function saveGlobalUpdates() {
+
+            const payload = {
+
+                id:
+                    valueOf(
+                        "profiler_student_id"
+                    ),
+
+                name:
+                    valueOf(
+                        "profiler_name"
+                    ),
+
+                mobile_no:
+                    valueOf(
+                        "profiler_mobile"
+                    ),
+
+                address:
+                    valueOf(
+                        "profiler_address"
+                    ),
+
+                course:
+                    valueOf(
+                        "profiler_course"
+                    ),
+
+                bill:
+                    valueOf(
+                        "profiler_bill"
+                    ) || "0",
+
+                notes:
+                    valueOf(
+                        "profiler_notes"
+                    )
+            };
+
+            if (
+                !payload.name ||
+                !payload.mobile_no ||
+                !payload.address ||
+                !payload.course
+            ) {
+
+                alert(
+                    "Please complete all required student fields."
                 );
 
-            badge.textContent =
-                "ONLINE - DATABASE CONNECTED";
+                return;
+            }
 
-            badge.style.color =
-                "#16a34a";
+            try {
 
-            connectionBadge.textContent =
-                "API ONLINE";
-
-            connectionBadge.style.color =
-                "#bbf7d0";
-
-            document.getElementById(
-                "audit_scholars_count"
-            ).textContent =
-                students.length;
-
-            const programs =
-                new Set(
-                    students
-                        .map(
-                            student =>
-                                String(
-                                    student.course ||
-                                    ""
+                const data =
+                    await apiFetch(
+                        "/students",
+                        {
+                            method: "PUT",
+                            body:
+                                JSON.stringify(
+                                    payload
                                 )
-                                .trim()
-                                .toUpperCase()
-                        )
-                        .filter(Boolean)
+                        }
+                    );
+
+                if (data.success) {
+
+                    closeProfiler();
+
+                    await runLedgerQuery();
+
+                    showStatus(
+                        "paymentStatus",
+                        "Student updated successfully.",
+                        true
+                    );
+                }
+
+            } catch (error) {
+
+                alert(
+                    "Unable to update student: " +
+                    error.message
+                );
+            }
+        }
+
+
+        // ============================================================
+        // PAYMENTS
+        // ============================================================
+
+        async function postPaymentTransaction() {
+
+            if (!activeSelectedScholar) {
+
+                showStatus(
+                    "paymentStatus",
+                    "Select a student from Search & Modify first.",
+                    false
                 );
 
-            document.getElementById(
-                "audit_programs_count"
-            ).textContent =
-                programs.size;
+                return;
+            }
 
-        } catch (error) {
+            const amount =
+                valueOf(
+                    "payment_amount_input"
+                );
+
+            if (!amount ||
+                Number(amount) <= 0) {
+
+                showStatus(
+                    "paymentStatus",
+                    "Enter a valid payment amount.",
+                    false
+                );
+
+                return;
+            }
+
+            const payload = {
+
+                id:
+                    String(
+                        activeSelectedScholar.id
+                    ),
+
+                amount:
+
+                    amount,
+
+                remarks:
+                    valueOf(
+                        "payment_remarks_input"
+                    ) ||
+                    "Installment Entry"
+            };
+
+            try {
+
+                const data =
+                    await apiFetch(
+                        "/payments",
+                        {
+                            method: "POST",
+                            body:
+                                JSON.stringify(
+                                    payload
+                                )
+                        }
+                    );
+
+                if (data.success) {
+
+                    showStatus(
+                        "paymentStatus",
+                        "Payment posted successfully.",
+                        true
+                    );
+
+                    document.getElementById(
+                        "payment_amount_input"
+                    ).value = "";
+
+                    document.getElementById(
+                        "payment_remarks_input"
+                    ).value = "";
+
+                    // Refresh selected student.
+                    await refreshSelectedStudent();
+
+                    runInfrastructureAudit();
+                }
+
+            } catch (error) {
+
+                showStatus(
+                    "paymentStatus",
+                    error.message,
+                    false
+                );
+            }
+        }
+
+
+        async function refreshSelectedStudent() {
+
+            if (!activeSelectedScholar) {
+                return;
+            }
+
+            const records =
+                await apiFetch(
+                    "/students/search?filter=" +
+                    encodeURIComponent(
+                        String(
+                            activeSelectedScholar.id
+                        )
+                    )
+                );
+
+            const updated =
+                records.find(
+                    student =>
+                        Number(student.id) ===
+                        Number(
+                            activeSelectedScholar.id
+                        )
+                );
+
+            if (updated) {
+
+                activeSelectedScholar =
+                    updated;
+
+                document.getElementById(
+                    "terminal_pending"
+                ).textContent =
+                    "₹" +
+                    moneyNumber(
+                        updated.pending_balance
+                    );
+            }
+        }
+
+
+        // ============================================================
+        // HEALTH / ADMIN
+        // ============================================================
+
+        async function runInfrastructureAudit() {
+
+            const badge =
+                document.getElementById(
+                    "db_status_badge"
+                );
+
+            const connectionBadge =
+                document.getElementById(
+                    "connectionBadge"
+                );
 
             badge.textContent =
-                "OFFLINE / API UNAVAILABLE";
+                "CHECKING...";
 
             badge.style.color =
-                "#dc2626";
+                "#ea580c";
 
             connectionBadge.textContent =
-                "API OFFLINE";
+                "Checking API...";
 
-            connectionBadge.style.color =
-                "#fecaca";
+            try {
 
-            document.getElementById(
-                "audit_scholars_count"
-            ).textContent =
-                "0";
+                await apiFetch(
+                    "/health"
+                );
 
-            document.getElementById(
-                "audit_programs_count"
-            ).textContent =
-                "0";
+                const students =
+                    await apiFetch(
+                        "/students/search?filter="
+                    );
+
+                badge.textContent =
+                    "ONLINE - DATABASE CONNECTED";
+
+                badge.style.color =
+                    "#16a34a";
+
+                connectionBadge.textContent =
+                    "API ONLINE";
+
+                connectionBadge.style.color =
+                    "#bbf7d0";
+
+                document.getElementById(
+                    "audit_scholars_count"
+                ).textContent =
+                    students.length;
+
+                const programs =
+                    new Set(
+                        students
+                            .map(
+                                student =>
+                                    String(
+                                        student.course ||
+                                        ""
+                                    )
+                                        .trim()
+                                        .toUpperCase()
+                            )
+                            .filter(Boolean)
+                    );
+
+                document.getElementById(
+                    "audit_programs_count"
+                ).textContent =
+                    programs.size;
+
+            } catch (error) {
+
+                badge.textContent =
+                    "OFFLINE / API UNAVAILABLE";
+
+                badge.style.color =
+                    "#dc2626";
+
+                connectionBadge.textContent =
+                    "API OFFLINE";
+
+                connectionBadge.style.color =
+                    "#fecaca";
+
+                document.getElementById(
+                    "audit_scholars_count"
+                ).textContent =
+                    "0";
+
+                document.getElementById(
+                    "audit_programs_count"
+                ).textContent =
+                    "0";
+            }
         }
-    }
 
 
-    // ============================================================
-    // HELPERS
-    // ============================================================
+        // ============================================================
+        // HELPERS
+        // ============================================================
 
-    function valueOf(id) {
+        function valueOf(id) {
 
-        const element =
-            document.getElementById(id);
+            const element =
+                document.getElementById(id);
 
-        if (!element) {
-            return "";
+            if (!element) {
+                return "";
+            }
+
+            return element.value.trim();
         }
 
-        return element.value.trim();
-    }
 
+        function moneyNumber(value) {
 
-    function moneyNumber(value) {
+            const number =
+                Number(value);
 
-        const number =
-            Number(value);
+            if (!Number.isFinite(number)) {
+                return "0.00";
+            }
 
-        if (!Number.isFinite(number)) {
-            return "0.00";
+            return number.toFixed(2);
         }
 
-        return number.toFixed(2);
-    }
 
+        function showStatus(
+            id,
+            message,
+            success
+        ) {
 
-    function showStatus(
-        id,
-        message,
-        success
-    ) {
+            const element =
+                document.getElementById(id);
 
-        const element =
-            document.getElementById(id);
+            element.textContent =
+                message;
 
-        element.textContent =
-            message;
+            element.className =
+                "status " +
+                (
+                    success
+                        ? "success"
+                        : "error"
+                );
+        }
 
-        element.className =
-            "status " +
-            (
-                success
-                    ? "success"
-                    : "error"
-            );
-    }
-
-</script>
+    </script>
 
 </body>
+
 </html>
