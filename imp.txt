@@ -1,1 +1,1 @@
- java -cp ".;mysql-connector-j-9.7.0.jar" Server
+ java -cp ".;mysql-connector-j-9.7.0.jar" Server 
